@@ -9,7 +9,6 @@ contract payments {
     address public contractOwner = msg.sender; 
     mapping(uint256 => address) public receipts;
     mapping(uint256 => uint256) public amounts;
-    mapping(uint256 => string) public paymentType;
     mapping(address => uint256) public balanceOf; 
     mapping(string => address) public delegationOwner;
     mapping(string => address) public delegationWithdrawAddress;
@@ -20,7 +19,7 @@ contract payments {
         percent["IDriss"] = 100;
     }
 
-    event PaymentDone(address payer, uint256 amount, string token, uint256 paymentId, uint256 date);
+    event PaymentDone(address payer, uint256 amount, uint256 paymentId, uint256 date);
     event AdminAdded(address indexed admin);
     event AdminDeleted(address indexed admin);
     event DelegateAdded(string delegateHandle, address indexed delegateAddress);
@@ -58,7 +57,7 @@ contract payments {
         require(delegateAddress != address(0), "Ownable: delegateAddress is the zero address.");
         delegationOwner[delegateHandle] = delegateAddress;
         delegationWithdrawAddress[delegateHandle] = delegateWithdrawAddress;
-        percent[delegateHandle] = 15; // TBD
+        percent[delegateHandle] = 20;
         emit DelegateAdded(delegateHandle, delegateAddress);
     }
 
@@ -84,14 +83,13 @@ contract payments {
         require(receipts[paymentId] == address(0), "Already paid this receipt.");
         receipts[paymentId] = msg.sender;
         amounts[paymentId] = msg.value;
-        paymentType[paymentId] = "MATIC";
         if (delegationOwner[delegateHandle] != address(0)) {
             balanceOf[contractOwner] += msg.value.sub((msg.value.mul(percent[delegateHandle])).div(100));
             balanceOf[delegationOwner[delegateHandle]] += (msg.value.mul(percent[delegateHandle])).div(100);
         } else {
             balanceOf[contractOwner] += msg.value;
         }
-        emit PaymentDone(receipts[paymentId], amounts[paymentId], paymentType[paymentId], paymentId, block.timestamp);
+        emit PaymentDone(receipts[paymentId], amounts[paymentId], paymentId, block.timestamp);
     }
 
     // Anyone can withraw funds to any participating delegate
