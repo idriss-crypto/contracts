@@ -1,2 +1,2 @@
 # Contracts
-A collection of solidity smar contracts IDriss is using
+A collection of solidity smart contracts IDriss is using
