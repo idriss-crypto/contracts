@@ -141,29 +141,45 @@ contract sendToHash is Ownable {
         return asset.amount;
     }
 
-    //TODO: rename
     /**
      * @notice This function allows a user to revert sending tokens to other IDriss and claim them back
      */
+
+    //TODO: implement -> transfering tokens + checks + reentrancyGuard
     function revertPayment(
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
     ) external {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
-        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[
-            ownerIDrissAddr
-        ][_assetContractAddress];
+        uint256 amountToRevert = 0;
 
-        uint128 amountToRevert = payerAssetMap[msg.sender][ownerIDrissAddr][
-            _assetContractAddress
-        ].amount;
+        if (_assetType == AssetType.Coin) {
+            amountToRevert = beneficiaryCoinBalance[ownerIDrissAddr];
+            (bool sent, ) = address(this).call{
+                value: amountToRevert,
+                gas: 40000
+            }("");
+            require(sent, "Failed to  withdraw");
+        } else {
+            amountToRevert = payerAssetMap[msg.sender][ownerIDrissAddr][
+                _assetContractAddress
+            ].amount;
+            AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[
+                ownerIDrissAddr
+            ][_assetContractAddress];
 
-        beneficiaryAsset.amount -= amountToRevert;
+            beneficiaryAsset.amount -= uint128(amountToRevert);
+            delete payerAssetMap[msg.sender][ownerIDrissAddr][
+                _assetContractAddress
+            ];
 
-        delete payerAssetMap[msg.sender][ownerIDrissAddr][
-            _assetContractAddress
-        ];
+            if (_assetType == AssetType.NFT) {
+                IERC721 nft = IERC721(_assetContractAddress);
+            } else if (_assetType == AssetType.Token) {
+                IERC20 token = IERC20(_assetContractAddress);
+            }
+        }
 
         emit AssetTransferReverted(
             ownerIDrissAddr,
