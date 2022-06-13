@@ -20,6 +20,7 @@ interface IDriss {
 struct AssetLiability {
     uint128 amount;
     uint128 claimableUntil;
+    uint256[] assetIds;
 }
 
 enum AssetType {
@@ -170,16 +171,27 @@ contract sendToHash is Ownable {
             ][_assetContractAddress];
 
             beneficiaryAsset.amount -= uint128(amountToRevert);
-            delete payerAssetMap[msg.sender][ownerIDrissAddr][
-                _assetContractAddress
-            ];
 
             if (_assetType == AssetType.NFT) {
+                //TODO: call for each asset
                 IERC721 nft = IERC721(_assetContractAddress);
+                nft.safeTransferFrom(
+                    address(this),
+                    msg.sender,
+                    beneficiaryAsset.assetId,
+                    ""
+                );
             } else if (_assetType == AssetType.Token) {
                 IERC20 token = IERC20(_assetContractAddress);
+
+                bool sent = token.transfer(msg.sender, amountToRevert);
+                require(sent, "Failed to  withdraw");
             }
         }
+
+        delete payerAssetMap[msg.sender][ownerIDrissAddr][
+            _assetContractAddress
+        ];
 
         emit AssetTransferReverted(
             ownerIDrissAddr,
