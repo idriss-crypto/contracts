@@ -18,8 +18,8 @@ interface IDriss {
 }
 
 struct AssetLiability {
-    uint128 amount;
-    uint128 claimableUntil;
+    uint256 amount;
+    uint256 claimableUntil;
     uint256[] assetIds;
 }
 
@@ -74,7 +74,6 @@ contract sendToHash is Ownable {
     constructor(uint256 _transferExpirationInSecs, address _IDrissAddr) {
         TRANSFER_EXPIRATION_IN_SECS = _transferExpirationInSecs;
         IDRISS_ADDR = _IDrissAddr;
-        //   _assignAdminRole();
     }
 
     /**
@@ -85,11 +84,48 @@ contract sendToHash is Ownable {
         string memory _IDrissHash,
         uint256 _amount,
         AssetType _assetType,
-        address _assetContractAddress
-    ) external {
-        //TODO: implement
+        address _assetContractAddress,
+        uint256[] calldata _assetIds
+    ) external payable {
+        //TODO: implement + reentrancy guard
 
-        uint256 claimableUntil = block.timestamp + TRANSFER_EXPIRATION_IN_SECS;
+        uint256 calculatedClaimableUntil = block.timestamp +
+            TRANSFER_EXPIRATION_IN_SECS;
+        address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
+
+        if (_assetType == AssetType.Coin) {
+            beneficiaryCoinBalance[ownerIDrissAddr] += msg.value;
+        } else {
+            AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[
+                ownerIDrissAddr
+            ][_assetContractAddress];
+
+            if (beneficiaryAsset.claimableUntil == 0) {
+                beneficiaryAsset = AssetLiability({
+                    amount: _amount,
+                    claimableUntil: calculatedClaimableUntil,
+                    assetIds: _assetIds
+                });
+            } else {
+                beneficiaryAsset.amount += _amount;
+                beneficiaryAsset.claimableUntil = calculatedClaimableUntil;
+                for (uint256 i = 0; i < _assetIds.length; i++) {
+                    //https://docs.soliditylang.org/en/v0.8.12/types.html#allocating-memory-arrays
+                    beneficiaryAsset.assetIds.push(_assetIds[i]);
+                }
+            }
+
+            _sendTokenAssetFrom(
+                beneficiaryAssetMap[ownerIDrissAddr][_assetContractAddress],
+                msg.sender,
+                address(this),
+                _assetContractAddress
+            );
+
+            beneficiaryAssetMap[ownerIDrissAddr][
+                _assetContractAddress
+            ] = beneficiaryAsset;
+        }
     }
 
     /**
@@ -142,7 +178,6 @@ contract sendToHash is Ownable {
     /**
      * @notice This function allows a user to revert sending tokens to other IDriss and claim them back
      */
-
     //TODO: implement -> transfering tokens + checks + reentrancyGuard
     function revertPayment(
         string memory _IDrissHash,
@@ -221,7 +256,19 @@ contract sendToHash is Ownable {
         IERC20 token = IERC20(_contractAddress);
 
         bool sent = token.transfer(_to, _asset.amount);
-        require(sent, "Failed to  withdraw");
+        require(sent, "Failed to transfer token");
+    }
+
+    function _sendTokenAssetFrom(
+        AssetLiability memory _asset,
+        address _from,
+        address _to,
+        address _contractAddress
+    ) internal {
+        IERC20 token = IERC20(_contractAddress);
+
+        bool sent = token.transferFrom(_from, _to, _asset.amount);
+        require(sent, "Failed to transfer token");
     }
 
     function _getAddressFromHash(string memory _IDrissHash)
@@ -229,6 +276,7 @@ contract sendToHash is Ownable {
         view
         returns (address)
     {
+        //TODO: check if the address is valid. Revert otherwise
         return IDriss(IDRISS_ADDR).IDrissOwners(_IDrissHash);
     }
 }
