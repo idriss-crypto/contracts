@@ -136,10 +136,7 @@ contract sendToHash is Ownable {
         address _beneficiary,
         address _assetContractAddress
     ) internal view returns (uint256) {
-        AssetLiability memory asset = beneficiaryAssetMap[_beneficiary][
-            _assetContractAddress
-        ];
-        return asset.amount;
+        return beneficiaryAssetMap[_beneficiary][_assetContractAddress].amount;
     }
 
     /**
@@ -169,29 +166,27 @@ contract sendToHash is Ownable {
             AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[
                 ownerIDrissAddr
             ][_assetContractAddress];
+            delete payerAssetMap[msg.sender][ownerIDrissAddr][
+                _assetContractAddress
+            ];
 
             beneficiaryAsset.amount -= uint128(amountToRevert);
 
             if (_assetType == AssetType.NFT) {
-                //TODO: call for each asset
-                IERC721 nft = IERC721(_assetContractAddress);
-                nft.safeTransferFrom(
+                _sendNFTAsset(
+                    beneficiaryAsset,
                     address(this),
                     msg.sender,
-                    beneficiaryAsset.assetId,
-                    ""
+                    _assetContractAddress
                 );
             } else if (_assetType == AssetType.Token) {
-                IERC20 token = IERC20(_assetContractAddress);
-
-                bool sent = token.transfer(msg.sender, amountToRevert);
-                require(sent, "Failed to  withdraw");
+                _sendTokenAsset(
+                    beneficiaryAsset,
+                    msg.sender,
+                    _assetContractAddress
+                );
             }
         }
-
-        delete payerAssetMap[msg.sender][ownerIDrissAddr][
-            _assetContractAddress
-        ];
 
         emit AssetTransferReverted(
             ownerIDrissAddr,
@@ -199,6 +194,34 @@ contract sendToHash is Ownable {
             _assetContractAddress,
             amountToRevert
         );
+    }
+
+    function _sendNFTAsset(
+        AssetLiability memory _asset,
+        address _from,
+        address _to,
+        address _contractAddress
+    ) internal {
+        IERC721 nft = IERC721(_contractAddress);
+        for (uint256 i = 0; i < _asset.assetIds.length; i++) {
+            nft.safeTransferFrom(
+                address(this),
+                msg.sender,
+                _asset.assetIds[i],
+                ""
+            );
+        }
+    }
+
+    function _sendTokenAsset(
+        AssetLiability memory _asset,
+        address _to,
+        address _contractAddress
+    ) internal {
+        IERC20 token = IERC20(_contractAddress);
+
+        bool sent = token.transfer(_to, _asset.amount);
+        require(sent, "Failed to  withdraw");
     }
 
     function _getAddressFromHash(string memory _IDrissHash)
