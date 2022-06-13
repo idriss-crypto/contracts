@@ -41,7 +41,7 @@ contract sendToHash is Ownable {
     mapping(address => mapping(address => AssetLiability)) beneficiaryAssetMap;
     mapping(address => uint256) beneficiaryCoinBalance;
 
-    address public immutable IDrissAddr;
+    address public immutable IDRISS_ADDR;
     uint256 public immutable TRANSFER_EXPIRATION_IN_SECS;
 
     //  modifier isRoleActive(address _who) {
@@ -73,7 +73,7 @@ contract sendToHash is Ownable {
 
     constructor(uint256 _transferExpirationInSecs, address _IDrissAddr) {
         TRANSFER_EXPIRATION_IN_SECS = _transferExpirationInSecs;
-        IDrissAddr = _IDrissAddr;
+        IDRISS_ADDR = _IDrissAddr;
         //   _assignAdminRole();
     }
 
@@ -229,6 +229,6 @@ contract sendToHash is Ownable {
         view
         returns (address)
     {
-        return IDriss(IDrissAddr).IDrissOwners(_IDrissHash);
+        return IDriss(IDRISS_ADDR).IDrissOwners(_IDrissHash);
     }
 }
