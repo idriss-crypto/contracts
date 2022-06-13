@@ -18,8 +18,6 @@ interface IDriss {
 }
 
 struct AssetLiability {
-    string assetType;
-    address assetAddress;
     uint128 amount;
     uint128 claimableUntil;
 }
@@ -116,10 +114,10 @@ contract sendToHash is Ownable {
 
         if (_assetType == AssetType.Coin) {
             return _balanceOfCoin(ownerIDrissAddr);
-        } else if (_assetType == AssetType.Token) {
-            return _balanceOfToken(ownerIDrissAddr, _assetContractAddress);
-        } else if (_assetType == AssetType.NFT) {
-            return _balanceOfNft(ownerIDrissAddr, _assetContractAddress);
+        } else if (
+            _assetType == AssetType.Token || _assetType == AssetType.NFT
+        ) {
+            return _balanceOfAsset(ownerIDrissAddr, _assetContractAddress);
         }
 
         return 0;
@@ -130,45 +128,48 @@ contract sendToHash is Ownable {
         view
         returns (uint256)
     {
-        //TODO: implement
-        return 0;
+        return beneficiaryCoinBalance[_beneficiary];
     }
 
-    function _balanceOfToken(
+    function _balanceOfAsset(
         address _beneficiary,
         address _assetContractAddress
     ) internal view returns (uint256) {
-        //TODO: implement
-        return 0;
-    }
-
-    function _balanceOfNft(address _beneficiary, address _assetContractAddress)
-        internal
-        view
-        returns (uint256)
-    {
-        //TODO: implement
-        return 0;
+        AssetLiability memory asset = beneficiaryAssetMap[_beneficiary][
+            _assetContractAddress
+        ];
+        return asset.amount;
     }
 
     //TODO: rename
     /**
      * @notice This function allows a user to revert sending tokens to other IDriss and claim them back
      */
-    function getAssetBack(
+    function revertPayment(
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
     ) external {
-        //TODO: implement
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
+        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[
+            ownerIDrissAddr
+        ][_assetContractAddress];
 
-        //TODO: change value
+        uint128 amountToRevert = payerAssetMap[msg.sender][ownerIDrissAddr][
+            _assetContractAddress
+        ].amount;
+
+        beneficiaryAsset.amount -= amountToRevert;
+
+        delete payerAssetMap[msg.sender][ownerIDrissAddr][
+            _assetContractAddress
+        ];
+
         emit AssetTransferReverted(
             ownerIDrissAddr,
             msg.sender,
             _assetContractAddress,
-            0
+            amountToRevert
         );
     }
 
@@ -178,17 +179,5 @@ contract sendToHash is Ownable {
         returns (address)
     {
         return IDriss(IDrissAddr).IDrissOwners(_IDrissHash);
-    }
-
-    function _getPayerAsset(
-        address _payerAddress,
-        address _beneficiaryAddress,
-        address _assetAddress
-    ) internal view returns (uint256 amount, uint256 claimableUntil) {
-        AssetLiability memory asset = payerAssetMap[_payerAddress][
-            _beneficiaryAddress
-        ][_assetAddress];
-
-        return (asset.amount, asset.claimableUntil);
     }
 }
