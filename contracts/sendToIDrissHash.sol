@@ -28,6 +28,7 @@ enum AssetType {
 //TODO: remove console.log after testing
 //TODO: set limits on assetId & payer array size
 //TODO: resolve issue with coin map address
+//TODO: add claim time check
 /**
  * @title sendToHash
  * @author Rafał Kalinowski
@@ -84,16 +85,21 @@ contract sendToHash is Ownable {
         beneficiaryAsset = _mergeAsset(beneficiaryAsset, _amount, calculatedClaimableUntil, _assetIds);
         payerAsset = _mergeAsset(payerAsset, _amount, calculatedClaimableUntil, _assetIds);
 
-        if (_assetType == AssetType.Token) {
-            _sendTokenAssetFrom(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
-        } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
+        if (_assetType == AssetType.Coin) {
+            beneficiaryAsset.amount += msg.value;
+            payerAsset.amount += msg.value;
         }
 
         beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress] = beneficiaryAsset;
         payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress] = payerAsset;
         //TODO: limit payers array
         beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].push(msg.sender);
+        
+        if (_assetType == AssetType.Token) {
+            _sendTokenAssetFrom(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
+        } else if (_assetType == AssetType.NFT) {
+            _sendNFTAsset(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
+        }
 
         emit AssetTransferred(_IDrissHash, msg.sender, _assetContractAddress, _amount);
     }
@@ -132,30 +138,23 @@ contract sendToHash is Ownable {
         address _assetContractAddress
     ) external payable {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
-        require(ownerIDrissAddr != address(0), "Address for the hash cannot be 0x0");
+        uint256 amountToClaim = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
+        AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
+        address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress];
 
-        uint256 amountToClaim = 0;
+        delete beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
 
-        // ==========
-        // ==========
-        // ==========
-        // ========== CHANGE
-        amountToClaim = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
-        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
-
-        delete payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress];
-        beneficiaryAsset.amount -= uint128(amountToClaim);
-
-        beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].push(msg.sender);
+        for (uint256 i = 0; i < payers.length; i++) {
+            beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].pop();
+            delete payerAssetMap[payers[i]][_IDrissHash][_assetType][_assetContractAddress];
+        }
 
         if (_assetType == AssetType.Coin) {
-            console.log("contract balance: ", address(this).balance);
+            console.log("sending %s wei to %s address", address(this).balance, ownerIDrissAddr);
             _sendCoin(ownerIDrissAddr, amountToClaim);
         } else if (_assetType == AssetType.NFT) {
-            console.log("reverting NFT transfer");
             _sendNFTAsset(beneficiaryAsset, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.Token) {
-            console.log("reverting token transfer");
             _sendTokenAsset(beneficiaryAsset, msg.sender, _assetContractAddress);
         }
 
@@ -198,24 +197,6 @@ contract sendToHash is Ownable {
 
         emit AssetTransferReverted(_IDrissHash, msg.sender, _assetContractAddress, amountToRevert);
     }
-
-    // function _handleTransfer(
-    //     AssetLiability calldata _asset,
-    //     AssetType _assetType,
-    //     address _from,
-    //     address payable _to,
-    //     address _assetContractAddress
-    //     ) internal {
-    //     uint256 amountToRevert = _asset.amount;
-
-    //     if (_assetType == AssetType.Coin) {
-    //         _sendCoin(msg.sender, amountToRevert);
-    //     } else if (_assetType == AssetType.NFT) {
-    //         _sendNFTAsset(_asset, _from, _to, _assetContractAddress);
-    //     } else if (_assetType == AssetType.Token) {
-    //         _sendTokenAssetFrom(_asset, _from, _to, _assetContractAddress);
-    //     }
-    // }
 
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
@@ -260,9 +241,9 @@ contract sendToHash is Ownable {
     function _getAddressFromHash (string memory _IDrissHash)
         internal
         view
-        returns (address)
+        returns (address IDrissAddress)
     {
-        //TODO: check if the address is valid. Revert otherwise
-        return IDriss(IDRISS_ADDR).IDrissOwners(_IDrissHash);
+        IDrissAddress = IDriss(IDRISS_ADDR).IDrissOwners(_IDrissHash);
+        require(IDrissAddress != address(0), "Address for the hash cannot be 0x0");
     }
 }
