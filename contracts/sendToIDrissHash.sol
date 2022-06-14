@@ -24,10 +24,9 @@ enum AssetType {
 }
 
 //TODO: add reentrancyGuard modifier
-//TODO: add coin claimableUntil
+//TODO: add coin claimableUntil check
 //TODO: remove console.log after testing
 //TODO: set limits on assetId & payer array size
-//TODO: resolve issue with coin map address
 //TODO: add claim time check
 /**
  * @title sendToHash
@@ -62,8 +61,9 @@ contract sendToHash is Ownable {
      *         being kept in an escrow until it's claimed by beneficiary or reverted by payer
      * @dev Note that you have to approve this contract address in ERC to handle them on user's behalf.
      *      It's best to approve contract by using non standard function just like
-     *      `increaseAllowance` in OpenZeppelin to mitigate risk of race condition and double spend
+     *      `increaseAllowance` in OpenZeppelin to mitigate risk of race condition and double spend.
      */
+     //TODO: prevent fiddling with allowance
     function sendToAnyone (
         string memory _IDrissHash,
         uint256 _amount,
@@ -150,15 +150,16 @@ contract sendToHash is Ownable {
         }
 
         if (_assetType == AssetType.Coin) {
-            console.log("sending %s wei to %s address", address(this).balance, ownerIDrissAddr);
+            console.log("sending %s wei to %s address", amountToClaim, ownerIDrissAddr);
             _sendCoin(ownerIDrissAddr, amountToClaim);
         } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(beneficiaryAsset, address(this), msg.sender, _assetContractAddress);
+            _sendNFTAsset(beneficiaryAsset, address(this), ownerIDrissAddr, _assetContractAddress);
         } else if (_assetType == AssetType.Token) {
-            _sendTokenAsset(beneficiaryAsset, msg.sender, _assetContractAddress);
+            console.log("sending %s tokens to %s address", beneficiaryAsset.amount, ownerIDrissAddr);
+            _sendTokenAsset(beneficiaryAsset, ownerIDrissAddr, _assetContractAddress);
         }
 
-        emit AssetTransferred(_IDrissHash, msg.sender, _assetContractAddress, amountToClaim);
+        emit AssetTransferred(_IDrissHash, ownerIDrissAddr, _assetContractAddress, amountToClaim);
     }
 
     function balanceOf (
