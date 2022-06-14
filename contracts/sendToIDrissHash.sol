@@ -39,6 +39,7 @@ contract sendToHash is Ownable {
     mapping(address => mapping(address => mapping(address => AssetLiability))) payerAssetMap;
     // beneficiary => assetAddress => AssetLiability
     mapping(address => mapping(address => AssetLiability)) beneficiaryAssetMap;
+    mapping(address => mapping(address => uint256)) payerCoinBalance;
     mapping(address => uint256) beneficiaryCoinBalance;
 
     address public immutable IDRISS_ADDR;
@@ -77,7 +78,8 @@ contract sendToHash is Ownable {
     }
 
     /**
-     * @notice This function allows a user to send tokens or coins to other IDriss
+     * @notice This function allows a user to send tokens or coins to other IDriss. They are
+     *         being kept in an escrow until
      * @dev Note that you have to approve this contract to handle ERCs on user's behalf
      */
     function sendToAnyone(
@@ -95,6 +97,7 @@ contract sendToHash is Ownable {
 
         if (_assetType == AssetType.Coin) {
             beneficiaryCoinBalance[ownerIDrissAddr] += msg.value;
+            payerCoinBalance[msg.sender][ownerIDrissAddr] += msg.value;
         } else {
             AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[
                 ownerIDrissAddr
@@ -109,19 +112,40 @@ contract sendToHash is Ownable {
             } else {
                 beneficiaryAsset.amount += _amount;
                 beneficiaryAsset.claimableUntil = calculatedClaimableUntil;
-                for (uint256 i = 0; i < _assetIds.length; i++) {
-                    //https://docs.soliditylang.org/en/v0.8.12/types.html#allocating-memory-arrays
-                    beneficiaryAsset.assetIds.push(_assetIds[i]);
+
+                if (_assetType == AssetType.Token) {
+                    _sendTokenAssetFrom(
+                        AssetLiability({
+                            amount: _amount,
+                            claimableUntil: calculatedClaimableUntil,
+                            assetIds: new uint256[](0)
+                        }),
+                        msg.sender,
+                        address(this),
+                        _assetContractAddress
+                    );
+                } else if (_assetType == AssetType.NFT) {
+                    for (uint256 i = 0; i < _assetIds.length; i++) {
+                        //https://docs.soliditylang.org/en/v0.8.12/types.html#allocating-memory-arrays
+                        //beneficiaryAsset.assetIds.push(_assetIds[i]);
+                    }
+
+                    _sendNFTAsset(
+                        AssetLiability({
+                            amount: _amount,
+                            claimableUntil: calculatedClaimableUntil,
+                            assetIds: _assetIds
+                        }),
+                        msg.sender,
+                        address(this),
+                        _assetContractAddress
+                    );
                 }
             }
 
-            _sendTokenAssetFrom(
-                beneficiaryAssetMap[ownerIDrissAddr][_assetContractAddress],
-                msg.sender,
-                address(this),
+            payerAssetMap[msg.sender][ownerIDrissAddr][
                 _assetContractAddress
-            );
-
+            ] = beneficiaryAsset; // TODO:change
             beneficiaryAssetMap[ownerIDrissAddr][
                 _assetContractAddress
             ] = beneficiaryAsset;
@@ -150,29 +174,16 @@ contract sendToHash is Ownable {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
 
         if (_assetType == AssetType.Coin) {
-            return _balanceOfCoin(ownerIDrissAddr);
+            return beneficiaryCoinBalance[ownerIDrissAddr];
         } else if (
             _assetType == AssetType.Token || _assetType == AssetType.NFT
         ) {
-            return _balanceOfAsset(ownerIDrissAddr, _assetContractAddress);
+            return
+                beneficiaryAssetMap[ownerIDrissAddr][_assetContractAddress]
+                    .amount;
         }
 
         return 0;
-    }
-
-    function _balanceOfCoin(address _beneficiary)
-        internal
-        view
-        returns (uint256)
-    {
-        return beneficiaryCoinBalance[_beneficiary];
-    }
-
-    function _balanceOfAsset(
-        address _beneficiary,
-        address _assetContractAddress
-    ) internal view returns (uint256) {
-        return beneficiaryAssetMap[_beneficiary][_assetContractAddress].amount;
     }
 
     /**
@@ -188,11 +199,10 @@ contract sendToHash is Ownable {
         uint256 amountToRevert = 0;
 
         if (_assetType == AssetType.Coin) {
-            amountToRevert = beneficiaryCoinBalance[ownerIDrissAddr];
-            (bool sent, ) = address(this).call{
-                value: amountToRevert,
-                gas: 40000
-            }("");
+            amountToRevert = payerCoinBalance[msg.sender][ownerIDrissAddr];
+            beneficiaryCoinBalance[ownerIDrissAddr] -= amountToRevert;
+            payerCoinBalance[msg.sender][ownerIDrissAddr] = 0;
+            (bool sent, ) = address(this).call{value: amountToRevert}("");
             require(sent, "Failed to  withdraw");
         } else {
             amountToRevert = payerAssetMap[msg.sender][ownerIDrissAddr][
@@ -201,10 +211,10 @@ contract sendToHash is Ownable {
             AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[
                 ownerIDrissAddr
             ][_assetContractAddress];
+
             delete payerAssetMap[msg.sender][ownerIDrissAddr][
                 _assetContractAddress
             ];
-
             beneficiaryAsset.amount -= uint128(amountToRevert);
 
             if (_assetType == AssetType.NFT) {
