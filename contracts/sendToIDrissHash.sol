@@ -185,7 +185,6 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         address _assetContractAddress
     ) external nonReentrant() {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
-        uint256 amountToClaim = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
         AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
         address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress];
 
@@ -197,16 +196,14 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         }
 
         if (_assetType == AssetType.Coin) {
-            console.log("sending %s wei to %s address", amountToClaim, ownerIDrissAddr);
-            _sendCoin(ownerIDrissAddr, amountToClaim);
+            _sendCoin(ownerIDrissAddr, beneficiaryAsset.amount);
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAsset(beneficiaryAsset, address(this), ownerIDrissAddr, _assetContractAddress);
         } else if (_assetType == AssetType.Token) {
-            console.log("sending %s tokens to %s address", beneficiaryAsset.amount, ownerIDrissAddr);
             _sendTokenAsset(beneficiaryAsset, ownerIDrissAddr, _assetContractAddress);
         }
 
-        emit AssetTransferred(_IDrissHash, ownerIDrissAddr, _assetContractAddress, amountToClaim);
+        emit AssetTransferred(_IDrissHash, ownerIDrissAddr, _assetContractAddress, beneficiaryAsset.amount);
     }
 
     function balanceOf (
