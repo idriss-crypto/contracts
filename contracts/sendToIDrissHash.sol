@@ -4,6 +4,8 @@ pragma solidity ^0.8.14;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "hardhat/console.sol";
 
 interface IDriss {
@@ -23,22 +25,51 @@ enum AssetType {
     NFT
 }
 
+interface ISendToHash {
+    function sendToAnyone (
+        string memory _IDrissHash,
+        uint256 _amount,
+        AssetType _assetType,
+        address _assetContractAddress,
+        uint256[] calldata _assetIds
+    ) external payable;
+
+    function claim (
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress
+    ) external payable;
+
+    function revertPayment (
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress
+    ) external;
+
+    function balanceOf (
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress
+    ) external view returns (uint256);
+}
+
 //TODO: add reentrancyGuard modifier
 //TODO: add coin claimableUntil check
 //TODO: remove console.log after testing
 //TODO: set limits on assetId & payer array size
 //TODO: add claim time check
+//TODO: add erc721 receiver function
 /**
  * @title sendToHash
  * @author Rafał Kalinowski
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
-contract sendToHash is Ownable {
+contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
     mapping(address => mapping(string => mapping(AssetType => mapping(address => AssetLiability)))) payerAssetMap;
     // beneficiaryHash => assetType => assetAddress => AssetLiability
     mapping(string => mapping(AssetType => mapping(address => AssetLiability))) beneficiaryAssetMap;
-    // beneficiaryHash => assetType => assetAddress => payer
+    // beneficiaryHash => assetType => assetAddress => payer[]
     mapping(string => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersMap;
 
     address public immutable IDRISS_ADDR;
@@ -246,5 +277,18 @@ contract sendToHash is Ownable {
     {
         IDrissAddress = IDriss(IDRISS_ADDR).IDrissOwners(_IDrissHash);
         require(IDrissAddress != address(0), "Address for the hash cannot be 0x0");
+    }
+   function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4) {
+       return IERC721Receiver.onERC721Received.selector;
+    }
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
+        return interfaceId == type(IERC165).interfaceId
+         || interfaceId == type(IERC721Receiver).interfaceId
+         || interfaceId == type(ISendToHash).interfaceId;
     }
 }
