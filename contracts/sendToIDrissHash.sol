@@ -39,7 +39,7 @@ interface ISendToHash {
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
-    ) external payable;
+    ) external;
 
     function revertPayment (
         string memory _IDrissHash,
@@ -56,15 +56,13 @@ interface ISendToHash {
 
 //TODO: add coin claimableUntil check
 //TODO: remove console.log after testing
-//TODO: set limits on assetId & payer array size
 //TODO: add claim time check
-//TODO: add erc721 receiver function
 /**
  * @title sendToHash
  * @author Rafał Kalinowski
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
-contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
+contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165 {
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
     mapping(address => mapping(string => mapping(AssetType => mapping(address => AssetLiability)))) payerAssetMap;
     // beneficiaryHash => assetType => assetAddress => AssetLiability
@@ -75,6 +73,7 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
     address public immutable IDRISS_ADDR;
     uint256 public immutable TRANSFER_EXPIRATION_IN_SECS;
     uint256 public immutable SINGLE_ASSET_PAYMENTS_LIMIT = 100;
+    uint256 public immutable DISTINCT_NFT_TRANSFER_LIMIT = 1000;
 
     event AssetTransferred(string indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
@@ -95,7 +94,6 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
      *      It's best to approve contract by using non standard function just like
      *      `increaseAllowance` in OpenZeppelin to mitigate risk of race condition and double spend.
      */
-     //TODO: prevent fiddling with allowance
      //TODO: verify IDrissHash length
     function sendToAnyone (
         string memory _IDrissHash,
@@ -104,21 +102,6 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         address _assetContractAddress,
         uint256[] calldata _assetIds
     ) external nonReentrant() payable {
-        //TODO: implement + reentrancy guard + checks
-        if (_assetType == AssetType.Coin) {
-            _checkNonZeroValue(msg.value, "Transferred value has to be bigger than 0");
-        } else {
-            _checkNonZeroValue(incomingAssetLiability.amount, "Asset value has to be bigger than 0");
-            _checkNonZeroAddress(_assetContractAddress, "Asset address cannot be 0");
-        }
-
-        // single asset type can hold only a limited amount of payments to claim,
-        // to prevent micro transactions bloating making claiming payments unprofitable
-        require(
-           beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].length < SINGLE_ASSET_PAYMENTS_LIMIT,
-           "Numer of pending payments for the asset reached its limit and has to be claimed to accept more."
-        );
-
         uint256 calculatedClaimableUntil = block.timestamp + TRANSFER_EXPIRATION_IN_SECS;
 
         AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
@@ -129,6 +112,26 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
             assetIds: _assetIds
         });
 
+
+        // single asset type can hold only a limited amount of payments and NFTs to claim,
+        // to prevent micro transactions bloating, making claiming payments unprofitable
+        require(
+           beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].length < SINGLE_ASSET_PAYMENTS_LIMIT,
+           "Numer of pending payments for the asset reached its limit and has to be claimed to send more."
+        );
+        require(
+           beneficiaryAsset.assetIds.length + _assetIds.length < DISTINCT_NFT_TRANSFER_LIMIT,
+           "Numer of NFTs for a contract reached its limit and has to be claimed to send more."
+        );
+
+        if (_assetType == AssetType.Coin) {
+            _checkNonZeroValue(msg.value, "Transferred value has to be bigger than 0");
+        } else {
+            _checkNonZeroValue(incomingAssetLiability.amount, "Asset value has to be bigger than 0");
+            _checkNonZeroAddress(_assetContractAddress, "Asset address cannot be 0");
+        }
+
+
         beneficiaryAsset = _mergeAsset(beneficiaryAsset, _amount, calculatedClaimableUntil, _assetIds);
         payerAsset = _mergeAsset(payerAsset, _amount, calculatedClaimableUntil, _assetIds);
 
@@ -138,14 +141,12 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         } else if (_assetType == AssetType.Token) {
             _sendTokenAssetFrom(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            _checkNonZeroValue(_assetIds.length, "NFT IDs to send cannot be empty");
             _sendNFTAsset(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
         }
 
         // state is modified after external calls, to avoid double spend attacks
         beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress] = beneficiaryAsset;
         payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress] = payerAsset;
-        //TODO: limit payers array
         beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].push(msg.sender);
 
         emit AssetTransferred(_IDrissHash, msg.sender, _assetContractAddress, _amount);
@@ -178,7 +179,6 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
     /**
      * @notice This function allows a user to revert sending tokens to other IDriss and claim them back
      */
-    //TODO: add checks if specific party have required allowance
     function claim (
         string memory _IDrissHash,
         AssetType _assetType,
@@ -187,6 +187,8 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
         AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
         address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress];
+
+        _checkNonZeroValue(beneficiaryAsset.amount, "Nothing to claim.");
 
         delete beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
 
@@ -203,7 +205,7 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
             _sendTokenAsset(beneficiaryAsset, ownerIDrissAddr, _assetContractAddress);
         }
 
-        emit AssetTransferred(_IDrissHash, ownerIDrissAddr, _assetContractAddress, beneficiaryAsset.amount);
+        emit AssetClaimed(_IDrissHash, ownerIDrissAddr, _assetContractAddress, beneficiaryAsset.amount);
     }
 
     function balanceOf (
@@ -217,7 +219,6 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
     /**
      * @notice This function allows a user to revert sending tokens to other IDriss and claim them back
      */
-    //TODO: implement -> transfering tokens + checks + reentrancyGuard
     function revertPayment (
         string memory _IDrissHash,
         AssetType _assetType,
@@ -226,16 +227,16 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
 
+        _checkNonZeroValue(amountToRevert, "Nothing to revert.");
+
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress];
-        beneficiaryAsset.amount -= uint128(amountToRevert);
+        beneficiaryAsset.amount -= amountToRevert;
 
         if (_assetType == AssetType.Coin) {
-            console.log("contract balance: ", address(this).balance);
             _sendCoin(msg.sender, amountToRevert);
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAsset(beneficiaryAsset, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.Token) {
-            console.log("reverting token transfer");
             _sendTokenAsset(beneficiaryAsset, msg.sender, _assetContractAddress);
         }
 
@@ -247,15 +248,17 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         require(sent, "Failed to withdraw");
     }
 
-    //TODO: think about adding check if the NFT was actually sent
     function _sendNFTAsset (
         AssetLiability memory _asset,
         address _from,
         address _to,
         address _contractAddress
     ) internal {
+        require(_asset.amount == _asset.assetIds.length, "Declared NFT amount is different from distinct NFT IDs list passed");
+
         IERC721 nft = IERC721(_contractAddress);
         for (uint256 i = 0; i < _asset.assetIds.length; i++) {
+            require(nft.getApproved(_asset.assetIds[i]) == _to, "Receiver is not approved to receive the NFT");
             nft.safeTransferFrom(_from, _to, _asset.assetIds[i], "");
         }
     }
@@ -301,13 +304,14 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
     }
 
    function onERC721Received (
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
+        address,
+        address,
+        uint256,
+        bytes calldata
     ) external returns (bytes4) {
        return IERC721Receiver.onERC721Received.selector;
     }
+
     function supportsInterface (bytes4 interfaceId) public view override returns (bool) {
         return interfaceId == type(IERC165).interfaceId
          || interfaceId == type(IERC721Receiver).interfaceId
