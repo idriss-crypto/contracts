@@ -1,16 +1,10 @@
 {
   "name": "idriss",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx hardhat test"
   },
-  "repository": {
-    "type": "git",
-    "url": "ssh://git@rafal-kalinowski.pl/opt/git/idriss.git"
-  },
-  "author": "",
+  "author": "Rafal Kalinowski",
   "license": "MIT",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.6",
@@ -18,8 +12,10 @@
     "@typechain/ethers-v5": "^7.2.0",
     "@typechain/hardhat": "^2.3.1",
     "@types/chai": "^4.2.22",
-    "@types/chai-as-promised": "^7.1.4",
+    "@types/chai-as-promised": "^7.1.5",
+    "@types/mocha": "^9.0.0",
     "chai": "^4.3.6",
+    "chai-as-promised": "^7.1.1",
     "ethereum-waffle": "^3.4.4",
     "ethers": "^5.6.8",
     "hardhat": "^2.9.9",

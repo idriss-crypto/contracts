@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MockToken is ERC20{
     constructor() ERC20("MockToken", "MCKT"){
@@ -10,9 +11,11 @@ contract MockToken is ERC20{
     }
 }
 
-contract MockNFT is ERC721{
-    constructor() ERC721("MockNFT", "MNFT"){
-        _mint(msg.sender,1000*10**18);
+contract MockNFT is ERC721, Ownable {
+    constructor() ERC721("MockNFT", "MNFT"){ }
+
+    function safeMint(address to, uint256 tokenId) public onlyOwner() {
+        _safeMint(to, tokenId);
     }
 }
 
@@ -22,6 +25,7 @@ contract IDriss {
     constructor(address _secondAddress) {
         IDrissOwnersMap["a"] = msg.sender;
         IDrissOwnersMap["b"] = _secondAddress;
+        IDrissOwnersMap["c"] = address(0);
     }
 
     function getIDriss(string memory _hash)
