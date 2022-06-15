@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
 interface IDriss {
@@ -101,7 +102,7 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         AssetType _assetType,
         address _assetContractAddress,
         uint256[] calldata _assetIds
-    ) external payable {
+    ) external nonReentrant() payable {
         //TODO: implement + reentrancy guard + checks
         uint256 calculatedClaimableUntil = block.timestamp + TRANSFER_EXPIRATION_IN_SECS;
 
@@ -167,7 +168,7 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
-    ) external payable {
+    ) external nonReentrant() {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
         uint256 amountToClaim = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
         AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
@@ -209,7 +210,7 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
-    ) external {
+    ) external nonReentrant() {
         uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
 
@@ -278,6 +279,15 @@ contract SendToHash is ISendToHash, Ownable, IERC721Receiver, IERC165 {
         IDrissAddress = IDriss(IDRISS_ADDR).IDrissOwners(_IDrissHash);
         require(IDrissAddress != address(0), "Address for the hash cannot be 0x0");
     }
+
+    function _isNonZeroAddress (address _addr, string memory message) internal pure {
+        require(_addr != address(0), message);
+    }
+
+    function _isNonZeroValue (uint256 _value, string memory message) internal pure {
+        require(_value > 0, message);
+    }
+
    function onERC721Received(
         address operator,
         address from,
