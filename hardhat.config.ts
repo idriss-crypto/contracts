@@ -1,6 +1,7 @@
 import '@nomiclabs/hardhat-waffle'
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
+import 'dotenv/config'
 
 import { HardhatUserConfig, task } from 'hardhat/config'
 

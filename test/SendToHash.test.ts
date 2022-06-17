@@ -21,7 +21,6 @@ const ASSET_TYPE_NFT = 2
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 describe('SendToHash contract', () => {
-   let accounts: Signer[];
    let owner: Signer;
    let signer1: Signer;
    let signer2: Signer;
@@ -39,8 +38,6 @@ describe('SendToHash contract', () => {
 
    beforeEach(async () => {
       provider = new MockProvider({ ganacheOptions: { gasLimit: 100000000 } })
-      accounts = provider.getWallets();
-      // [owner, signer1, signer2, signer3] = accounts;
       // for whatever reason accounts have problem with managing nonces
       owner = provider.getSigner(0)
       signer1 = provider.getSigner(1)
@@ -67,12 +64,6 @@ describe('SendToHash contract', () => {
       await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [])).to.be.revertedWith('Transferred value has to be bigger than 0')
       await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
       await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
-   })
-
-   it('reverts sendToAnyone when conditions are not met 2', async () => {
-   })
-
-   it('reverts sendToAnyone when conditions are not met 3', async () => {
    })
 
    // it('returns expected URL for a token', async () => {
