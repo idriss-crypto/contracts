@@ -40,7 +40,12 @@ describe('SendToHash contract', () => {
    beforeEach(async () => {
       provider = new MockProvider({ ganacheOptions: { gasLimit: 100000000 } })
       accounts = provider.getWallets();
-      [owner, signer1, signer2, signer3] = accounts;
+      // [owner, signer1, signer2, signer3] = accounts;
+      // for whatever reason accounts have problem with managing nonces
+      owner = provider.getSigner(0)
+      signer1 = provider.getSigner(1)
+      signer2 = provider.getSigner(2)
+      signer3 = provider.getSigner(3)
       ownerAddress = await owner.getAddress()
       signer1Address = await signer1.getAddress()
       signer2Address = await signer2.getAddress()
@@ -51,27 +56,23 @@ describe('SendToHash contract', () => {
       idriss = (await waffle.deployContract(owner, IDrissArtifact, [signer2Address])) as IDriss
       sendToHash = (await waffle.deployContract(owner, SendToHashArtifact, [60 * 60 * 24 * 7, idriss.address])) as SendToHash
 
-      await new Promise(resolve => { setTimeout(resolve, 1000); });
-
       // unfortunately we can't use Promise.all, because transaction nonces got wrecked by concurrency
       NFT_ID_ARRAY.forEach( async (val, idx, _) => { 
          await mockNFT.safeMint(signer1Address, val)
       })
 
-      await new Promise(resolve => { setTimeout(resolve, 1000); });
    })
 
-   it('reverts sendToAnyone when conditions are not met', async () => {
+   it('reverts sendToAnyone when value is zero', async () => {
       await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [])).to.be.revertedWith('Transferred value has to be bigger than 0')
-      await new Promise(resolve => { setTimeout(resolve, 1000); });
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
    })
 
    it('reverts sendToAnyone when conditions are not met 2', async () => {
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
    })
 
    it('reverts sendToAnyone when conditions are not met 3', async () => {
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
    })
 
    // it('returns expected URL for a token', async () => {
