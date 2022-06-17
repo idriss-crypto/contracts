@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -101,7 +101,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         AssetType _assetType,
         address _assetContractAddress,
         uint256[] calldata _assetIds
-    ) external nonReentrant() payable {
+    ) external override nonReentrant() payable {
         uint256 calculatedClaimableUntil = block.timestamp + TRANSFER_EXPIRATION_IN_SECS;
 
         AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
@@ -183,7 +183,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
-    ) external nonReentrant() {
+    ) external override nonReentrant() {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
         AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
         address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress];
@@ -212,7 +212,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
-    ) external view returns (uint256) {
+    ) external override view returns (uint256) {
         return beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress].amount;
     }
 
@@ -223,7 +223,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         string memory _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
-    ) external nonReentrant() {
+    ) external override nonReentrant() {
         uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
 
@@ -308,7 +308,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address,
         uint256,
         bytes calldata
-    ) external returns (bytes4) {
+    ) external override returns (bytes4) {
        return IERC721Receiver.onERC721Received.selector;
     }
 
