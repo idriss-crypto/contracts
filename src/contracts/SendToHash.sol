@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
@@ -63,6 +66,8 @@ interface ISendToHash {
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
 contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165 {
+    using SafeCast for int256;
+
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
     mapping(address => mapping(string => mapping(AssetType => mapping(address => AssetLiability)))) payerAssetMap;
     // beneficiaryHash => assetType => assetAddress => AssetLiability
@@ -74,6 +79,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     uint256 public immutable TRANSFER_EXPIRATION_IN_SECS;
     uint256 public immutable SINGLE_ASSET_PAYMENTS_LIMIT = 100;
     uint256 public immutable DISTINCT_NFT_TRANSFER_LIMIT = 1000;
+    uint256 public constant PAYMENT_FEE_PERCENTAGE = 10;
+    uint256 public constant PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
+    uint256 public paymentFeesBalance;
+    AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
 
     event AssetTransferred(string indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
@@ -82,9 +91,15 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     event AssetTransferReverted(string indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
 
-    constructor(uint256 _transferExpirationInSecs, address _IDrissAddr) {
+    constructor(
+        uint256 _transferExpirationInSecs,
+        address _IDrissAddr,
+        address _maticUsdAggregator
+    )
+    {
         TRANSFER_EXPIRATION_IN_SECS = _transferExpirationInSecs;
         IDRISS_ADDR = _IDrissAddr;
+        MATIC_USD_PRICE_FEED = AggregatorV3Interface(_maticUsdAggregator);
     }
 
     /**
@@ -112,7 +127,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             assetIds: _assetIds
         });
 
+        //TODO: think about reimbursement for Tokens and NFTs
+        (uint256 fee, uint256 paymentValue, uint256 reimbursement) = _splitPayment(msg.value);
 
+        //TODO: think if this still holds true after adding minimal fee
         // single asset type can hold only a limited amount of payments and NFTs to claim,
         // to prevent micro transactions bloating, making claiming payments unprofitable
         require(
@@ -124,8 +142,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
            "Numer of NFTs for a contract reached its limit and has to be claimed to send more."
         );
 
+        require (msg.value >= fee, "Value sent is smaller than minimal fee.");
+
         if (_assetType == AssetType.Coin) {
-            _checkNonZeroValue(msg.value, "Transferred value has to be bigger than 0");
+            _checkNonZeroValue(paymentValue, "Transferred value has to be bigger than 0");
         } else {
             _checkNonZeroValue(incomingAssetLiability.amount, "Asset value has to be bigger than 0");
             _checkNonZeroAddress(_assetContractAddress, "Asset address cannot be 0");
@@ -136,18 +156,19 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         payerAsset = _mergeAsset(payerAsset, _amount, calculatedClaimableUntil, _assetIds);
 
         if (_assetType == AssetType.Coin) {
-            beneficiaryAsset.amount += msg.value;
-            payerAsset.amount += msg.value;
+            beneficiaryAsset.amount += paymentValue;
+            payerAsset.amount += paymentValue;
         } else if (_assetType == AssetType.Token) {
             _sendTokenAssetFrom(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAsset(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
         }
 
-        // state is modified after external calls, to avoid double spend attacks
+        // state is modified after external calls, to avoid reentrancy attacks
         beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress] = beneficiaryAsset;
         payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress] = payerAsset;
         beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].push(msg.sender);
+        paymentFeesBalance += fee;
 
         emit AssetTransferred(_IDrissHash, msg.sender, _assetContractAddress, _amount);
     }
@@ -174,6 +195,22 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
                 claimableUntil: _claimableUntil,
                 assetIds: concatenatedAssetIds
             });
+    }
+
+    function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value, uint256 reimbursement) {
+        uint256 paymentFee;
+        //TODO: check if price is adjusted to 10**18
+        uint256 maticPrice = _getMaticUsdPrice();
+
+        if ((_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR > maticPrice) {
+            fee = (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
+        } else {
+            fee = maticPrice;
+        }
+
+        value = _value - fee;
+        //reimbursement is required for Tokens and NFTs
+        reimbursement = _value - maticPrice;
     }
 
     /**
@@ -243,6 +280,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetTransferReverted(_IDrissHash, msg.sender, _assetContractAddress, amountToRevert);
     }
 
+    function claimPaymentFees() onlyOwner external {
+        uint256 amountToClaim = paymentFeesBalance;
+        paymentFeesBalance = 0;
+
+        _sendCoin(msg.sender, amountToClaim);
+    }
+
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
         require(sent, "Failed to withdraw");
@@ -293,6 +337,12 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     {
         IDrissAddress = IDriss(IDRISS_ADDR).IDrissOwners(_IDrissHash);
         _checkNonZeroAddress(IDrissAddress, "Address for the IDriss hash cannot resolve to 0x0");
+    }
+
+    function _getMaticUsdPrice() internal view returns (uint) {
+        (,int price,,,) = MATIC_USD_PRICE_FEED.latestRoundData();
+
+        return price.toUint256();
     }
 
     function _checkNonZeroAddress (address _addr, string memory message) internal pure {
