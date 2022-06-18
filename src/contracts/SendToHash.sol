@@ -102,8 +102,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
            "Numer of NFTs for a contract reached its limit and has to be claimed to send more."
         );
 
-        require (msg.value >= fee, "Value sent is smaller than minimal fee.");
-
         if (_assetType == AssetType.Coin) {
             _checkNonZeroValue(paymentValue, "Transferred value has to be bigger than 0");
         } else {
@@ -166,6 +164,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else {
             fee = maticPrice;
         }
+
+        require (_value >= fee, "Value sent is smaller than minimal fee.");
 
         value = _value - fee;
     }
