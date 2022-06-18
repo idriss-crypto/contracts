@@ -3,6 +3,7 @@ pragma solidity ^0.8.7;
 
 //TODO: check how matic Oracle works
 contract MaticPriceAggregatorV3Mock {
+   int256 price = 36662934;
   function decimals() public view returns (uint8) {
      return 8;
   }
@@ -31,7 +32,7 @@ contract MaticPriceAggregatorV3Mock {
        uint80 safeBlockNumber = uint80(block.number % type(uint80).max);
        return (
           safeBlockNumber,
-          36662934,
+          price,
           block.timestamp,
           block.timestamp,
           safeBlockNumber
@@ -51,25 +52,14 @@ contract MaticPriceAggregatorV3Mock {
        uint80 safeBlockNumber = uint80(block.number % type(uint80).max);
        return (
           safeBlockNumber,
-          36662934,
+          price,
           block.timestamp,
           block.timestamp,
           safeBlockNumber
        );
     }
 
-   /*
-   * @notice Get current amount of wei in a dollar
-   * @dev ChainLink officially supports only USD -> MATIC,
-   *      so we have to convert it back to get current amount of wei in a dollar
-   */
-   function dollarToWei() internal view returns (uint256) {
-       (,int256 maticPrice,,,) = latestRoundData();
-       if (maticPrice <= 0) {
-           return 0;
-       }
-
-       uint256 maticPriceMultiplier = 10**decimals();
-       return(10**18 * maticPriceMultiplier) / uint256(maticPrice);
-    }
+   function setPrice(int256 _price) external {
+      price = _price;
+   }
 }
