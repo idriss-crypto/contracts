@@ -20,7 +20,7 @@ import { AssetType } from "./enums/IDrissEnums.sol";
 
 //TODO: add coin claimableUntil check
 //TODO: remove console.log after testing
-//TODO: add claim time check
+//TODO: move utils functions to library
 /**
  * @title sendToHash
  * @author Rafał Kalinowski
@@ -36,14 +36,14 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     // beneficiaryHash => assetType => assetAddress => payer[]
     mapping(string => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersMap;
 
+    AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
     address public immutable IDRISS_ADDR;
     uint256 public immutable TRANSFER_EXPIRATION_IN_SECS;
-    uint256 public immutable SINGLE_ASSET_PAYMENTS_LIMIT = 100;
-    uint256 public immutable DISTINCT_NFT_TRANSFER_LIMIT = 1000;
+    uint256 public constant SINGLE_ASSET_PAYMENTS_LIMIT = 100;
+    uint256 public constant DISTINCT_NFT_TRANSFER_LIMIT = 1000;
     uint256 public constant PAYMENT_FEE_PERCENTAGE = 10;
     uint256 public constant PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
     uint256 public paymentFeesBalance;
-    AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
 
     event AssetTransferred(string indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
@@ -159,8 +159,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     }
 
     function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
-        //TODO: check if price is adjusted to 10**18
-        uint256 maticPrice = _getMaticUsdPrice();
+        uint256 maticPrice = _dollarToWei();
 
         if ((_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR > maticPrice) {
             fee = (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
@@ -350,10 +349,18 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         return resultAddress;
     }
 
-    function _getMaticUsdPrice() internal view returns (uint) {
-        (,int price,,,) = MATIC_USD_PRICE_FEED.latestRoundData();
+    /*
+    * @notice Get current amount of wei in a dollar
+    * @dev ChainLink officially supports only USD -> MATIC,
+    *      so we have to convert it back to get current amount of wei in a dollar
+    */
+    function _dollarToWei() internal view returns (uint256) {
+        (,int256 maticPrice,,,) = MATIC_USD_PRICE_FEED.latestRoundData();
+        require (maticPrice > 0, "Unable to retrieve MATIC price.");
 
-        return price.toUint256();
+        uint256 maticPriceMultiplier = 10**MATIC_USD_PRICE_FEED.decimals();
+
+        return(10**18 * maticPriceMultiplier) / uint256(maticPrice);
     }
 
     function _checkNonZeroAddress (address _addr, string memory message) internal pure {
@@ -379,3 +386,4 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
          || interfaceId == type(ISendToHash).interfaceId;
     }
 }
+
