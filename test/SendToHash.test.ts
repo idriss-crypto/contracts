@@ -77,27 +77,31 @@ describe('SendToHash contract', () => {
    it ('reverts sendToAnyone() when asset address is 0', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts sendToAnyone() when asset amount is 0', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts sendToAnyone() when NFT amount and assetIds array length doesn\'t match', async () => {
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts sendToAnyone() when declared and real amount of assets does not match', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('properly handles asset address for MATIC transfer', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
-
 
    it ('properly handles amounts in sendToAnyone() for MATIC transfer', async () => { const dollarInWei = await mockPriceOracle.dollarToWei()
       const minimumAcceptablePayment = dollarInWei.add(1)
@@ -139,70 +143,96 @@ describe('SendToHash contract', () => {
    it ('properly handles amounts in sendToAnyone() for multiple Token transfer of the same type', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
+   })
+
+   it ('properly handles assets for multiple asset transfers', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+      expect(0).to.be.equal(1)
+   })
+
+   it ('properly handles assets for multiple asset transfers and reversals', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('properly handles amounts in sendToAnyone() for multiple Token transfer of many types', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('properly handles amounts in sendToAnyone() for multiple NFT transfer of the same type', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('properly handles amounts in sendToAnyone() for multiple NFT transfer of many types', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('prevents reentrancy attacks', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('allows transfering all fees earned by the contract to the owner', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts revertPayment() when there is nothing to revert', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts revertPayment() when trying go revert payment second time', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('properly handles successful revertPayment()', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts claim() when there is nothing to claim', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts claim() when IDriss hash does not resolve to proper address', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('properly handles successful claim()', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('reverts claim() when trying go claim payment for second time', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 
    it ('emits events on successful function invocations', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
+      expect(0).to.be.equal(1)
    })
 })
