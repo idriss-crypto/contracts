@@ -12,50 +12,11 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
-interface IDriss {
-    function getIDriss(string memory hashPub) external view returns (string memory);
-    function IDrissOwners(string memory _address) external view returns (address);
-}
+import { ISendToHash } from "interfaces/ISendToHash.sol";
+import { IIDrissRegistry } from "interfaces/IIDrissRegistry.sol"
+import { AssetLiability } from "structs/IDrissStructs.sol";
+import { AssetType } from "enums/IDrissEnums.sol";
 
-struct AssetLiability {
-    uint256 amount;
-    uint256 claimableUntil;
-    uint256[] assetIds;
-}
-
-enum AssetType {
-    Coin,
-    Token,
-    NFT
-}
-
-interface ISendToHash {
-    function sendToAnyone (
-        string memory _IDrissHash,
-        uint256 _amount,
-        AssetType _assetType,
-        address _assetContractAddress,
-        uint256[] calldata _assetIds
-    ) external payable;
-
-    function claim (
-        string memory _IDrissHash,
-        AssetType _assetType,
-        address _assetContractAddress
-    ) external;
-
-    function revertPayment (
-        string memory _IDrissHash,
-        AssetType _assetType,
-        address _assetContractAddress
-    ) external;
-
-    function balanceOf (
-        string memory _IDrissHash,
-        AssetType _assetType,
-        address _assetContractAddress
-    ) external view returns (uint256);
-}
 
 //TODO: add coin claimableUntil check
 //TODO: remove console.log after testing
@@ -119,6 +80,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     ) external override nonReentrant() payable {
         uint256 calculatedClaimableUntil = block.timestamp + TRANSFER_EXPIRATION_IN_SECS;
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
+        (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value);
 
         AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability memory payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
@@ -128,17 +90,15 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             assetIds: _assetIds
         });
 
-        //TODO: think about reimbursement for Tokens and NFTs
-        (uint256 fee, uint256 paymentValue, uint256 reimbursement) = _splitPayment(msg.value);
 
         //TODO: think if this still holds true after adding minimal fee
         // single asset type can hold only a limited amount of payments and NFTs to claim,
         // to prevent micro transactions bloating, making claiming payments unprofitable
-        require(
+        require (
            beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].length < SINGLE_ASSET_PAYMENTS_LIMIT,
            "Numer of pending payments for the asset reached its limit and has to be claimed to send more."
         );
-        require(
+        require (
            beneficiaryAsset.assetIds.length + _assetIds.length < DISTINCT_NFT_TRANSFER_LIMIT,
            "Numer of NFTs for a contract reached its limit and has to be claimed to send more."
         );
@@ -157,6 +117,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         payerAsset = _mergeAsset(payerAsset, _amount, calculatedClaimableUntil, _assetIds);
 
         if (_assetType == AssetType.Coin) {
+            incomingAssetLiability.amount = paymentValue;
             beneficiaryAsset.amount += paymentValue;
             payerAsset.amount += paymentValue;
         } else if (_assetType == AssetType.Token) {
@@ -171,7 +132,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
         paymentFeesBalance += fee;
 
-        emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
+        emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, incomingAssetLiability.amount);
     }
 
     function _mergeAsset (
@@ -198,8 +159,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             });
     }
 
-    function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value, uint256 reimbursement) {
-        uint256 paymentFee;
+    function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
         //TODO: check if price is adjusted to 10**18
         uint256 maticPrice = _getMaticUsdPrice();
 
@@ -210,8 +170,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
 
         value = _value - fee;
-        //reimbursement is required for Tokens and NFTs
-        reimbursement = _value - maticPrice;
     }
 
     /**
@@ -352,7 +310,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         view
         returns (address IDrissAddress)
     {
-        string memory IDrissString = IDriss(IDRISS_ADDR).getIDriss(_IDrissHash);
+        string memory IDrissString = IIDrissRegistry(IDRISS_ADDR).getIDriss(_IDrissHash);
         IDrissAddress = _safeHexStringToAddress(IDrissString);
         _checkNonZeroAddress(IDrissAddress, "Address for the IDriss hash cannot resolve to 0x0");
     }
@@ -375,7 +333,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     /**
     * @notice Get address from string. Revert if address is invalid.
     */    
-    function _safeHexStringToAddress(string calldata s) internal pure returns (address) {
+    function _safeHexStringToAddress(string memory s) internal pure returns (address) {
         bytes memory ss = bytes(s);
         require(ss.length == 42, "Address length is invalid");
         bytes memory _bytes = new bytes(ss.length / 2);
