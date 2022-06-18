@@ -12,10 +12,10 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
-import { ISendToHash } from "interfaces/ISendToHash.sol";
-import { IIDrissRegistry } from "interfaces/IIDrissRegistry.sol";
-import { AssetLiability } from "structs/IDrissStructs.sol";
-import { AssetType } from "enums/IDrissEnums.sol";
+import { ISendToHash } from "./interfaces/ISendToHash.sol";
+import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
+import { AssetLiability } from "./structs/IDrissStructs.sol";
+import { AssetType } from "./enums/IDrissEnums.sol";
 
 
 //TODO: add coin claimableUntil check

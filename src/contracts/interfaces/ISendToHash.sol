@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-import { AssetType } from "enums/IDrissEnums.sol";
+import { AssetType } from "../enums/IDrissEnums.sol";
 
 interface ISendToHash {
     function sendToAnyone (
