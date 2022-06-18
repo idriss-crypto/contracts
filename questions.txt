@@ -1,5 +1,0 @@
-if there is no automatic repayment, then do we need to set time to claim an asset?
-what about white characters, are you removing them via frontend?
-do you make case insensitive searches?
-phishing attack protection? E.g. we've seen that you are trying to 
-did you check if you can have unicode characters in mail address or Twitter handle? E.g. unicode char that looks just like ASCII "o" char

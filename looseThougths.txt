@@ -1,5 +1,0 @@
-* using standards, that is OpenZeppelin IERC20
-* passing other contract address as immutable variable in constructor - eg. as in reverseMapping
-* creating a separate interface for IDriss registry
-* automating deployment
-* adding some time (for example 2 hours, or a day) for IDriss to be registered - protection agains phishing attack
