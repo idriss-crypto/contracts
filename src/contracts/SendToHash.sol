@@ -118,9 +118,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         uint256[] calldata _assetIds
     ) external override nonReentrant() payable {
         uint256 calculatedClaimableUntil = block.timestamp + TRANSFER_EXPIRATION_IN_SECS;
+        address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
 
-        AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
-        AssetLiability memory payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress];
+        AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        AssetLiability memory payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability memory incomingAssetLiability = AssetLiability({
             amount: _amount,
             claimableUntil: calculatedClaimableUntil,
@@ -134,7 +135,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         // single asset type can hold only a limited amount of payments and NFTs to claim,
         // to prevent micro transactions bloating, making claiming payments unprofitable
         require(
-           beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].length < SINGLE_ASSET_PAYMENTS_LIMIT,
+           beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].length < SINGLE_ASSET_PAYMENTS_LIMIT,
            "Numer of pending payments for the asset reached its limit and has to be claimed to send more."
         );
         require(
@@ -165,12 +166,12 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
 
         // state is modified after external calls, to avoid reentrancy attacks
-        beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress] = beneficiaryAsset;
-        payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress] = payerAsset;
-        beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].push(msg.sender);
+        beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress] = beneficiaryAsset;
+        payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress] = payerAsset;
+        beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
         paymentFeesBalance += fee;
 
-        emit AssetTransferred(_IDrissHash, msg.sender, _assetContractAddress, _amount);
+        emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
     }
 
     function _mergeAsset (
@@ -222,16 +223,17 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address _assetContractAddress
     ) external override nonReentrant() {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
-        AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
-        address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress];
+        address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
+        AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress];
 
         _checkNonZeroValue(beneficiaryAsset.amount, "Nothing to claim.");
 
-        delete beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
+        delete beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
 
         for (uint256 i = 0; i < payers.length; i++) {
-            beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress].pop();
-            delete payerAssetMap[payers[i]][_IDrissHash][_assetType][_assetContractAddress];
+            beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].pop();
+            delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress];
         }
 
         if (_assetType == AssetType.Coin) {
@@ -242,7 +244,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             _sendTokenAsset(beneficiaryAsset, ownerIDrissAddr, _assetContractAddress);
         }
 
-        emit AssetClaimed(_IDrissHash, ownerIDrissAddr, _assetContractAddress, beneficiaryAsset.amount);
+        emit AssetClaimed(_IDrissHash, ownerIDrissAddr, adjustedAssetAddress, beneficiaryAsset.amount);
     }
 
     function balanceOf (
@@ -250,7 +252,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         AssetType _assetType,
         address _assetContractAddress
     ) external override view returns (uint256) {
-        return beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress].amount;
+        address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
+        return beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].amount;
     }
 
     /**
@@ -261,12 +264,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         AssetType _assetType,
         address _assetContractAddress
     ) external override nonReentrant() {
-        uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress].amount;
-        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress];
+        address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
+        uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].amount;
+        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
 
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
 
-        delete payerAssetMap[msg.sender][_IDrissHash][_assetType][_assetContractAddress];
+        delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
         beneficiaryAsset.amount -= amountToRevert;
 
         if (_assetType == AssetType.Coin) {
@@ -277,7 +281,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             _sendTokenAsset(beneficiaryAsset, msg.sender, _assetContractAddress);
         }
 
-        emit AssetTransferReverted(_IDrissHash, msg.sender, _assetContractAddress, amountToRevert);
+        emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert);
     }
 
     function claimPaymentFees() onlyOwner external {
@@ -328,6 +332,19 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         bool sent = token.transferFrom(_from, _to, _asset.amount);
         require(sent, "Failed to transfer token");
+    }
+
+    /**
+    * @notice Helper function to set asset address to 0 for coins for asset mapping
+    */
+    function _adjustAddress(address _addr, AssetType _assetType)
+        internal
+        pure
+        returns (address) {
+            if (_assetType == AssetType.Coin) {
+                return address(0);
+            }
+            return _addr;
     }
 
     function _getAddressFromHash (string memory _IDrissHash)
