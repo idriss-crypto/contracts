@@ -1,11 +1,13 @@
 import { ethers, waffle } from 'hardhat'
-import { Signer } from 'ethers'
+import { BigNumber, Signer } from 'ethers'
 import chai, { expect } from 'chai'
 import { IDriss } from '../src/types/IDriss'
-import IDrissArtifact from '../src/artifacts/src/contracts/IDrissRegistryMock.sol/IDriss.json'
+import IDrissArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/IDriss.json'
+import { MaticPriceAggregatorV3Mock } from '../src/types/MaticPriceAggregatorV3Mock'
+import MaticPriceAggregatorV3MockArtifact from '../src/artifacts/src/contracts/mocks/MaticPriceAggregatorV3Mock.sol/MaticPriceAggregatorV3Mock.json'
 import { MockNFT } from '../src/types/MockNFT'
-import MockNFTArtifact from '../src/artifacts/src/contracts/IDrissRegistryMock.sol/MockNFT.json'
-import MockTokenArtifact from '../src/artifacts/src/contracts/IDrissRegistryMock.sol/MockToken.json'
+import MockNFTArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockNFT.json'
+import MockTokenArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockToken.json'
 import { MockToken } from '../src/types/MockToken'
 import { SendToHash } from '../src/types/SendToHash'
 import SendToHashArtifact from '../src/artifacts/src/contracts/SendToHash.sol/SendToHash.json'
@@ -33,12 +35,12 @@ describe('SendToHash contract', () => {
    let idriss: IDriss
    let mockToken: MockToken
    let mockNFT: MockNFT
+   let mockPriceOracle: MaticPriceAggregatorV3Mock
    let NFT_ID_ARRAY = [... Array(10).keys()]
    let provider: MockProvider
 
    beforeEach(async () => {
       provider = new MockProvider({ ganacheOptions: { gasLimit: 100000000 } })
-      // for whatever reason accounts have problem with managing nonces
       owner = provider.getSigner(0)
       signer1 = provider.getSigner(1)
       signer2 = provider.getSigner(2)
@@ -50,26 +52,107 @@ describe('SendToHash contract', () => {
 
       mockToken = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
       mockNFT = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
+      mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
       idriss = (await waffle.deployContract(owner, IDrissArtifact, [signer2Address])) as IDriss
-      sendToHash = (await waffle.deployContract(owner, SendToHashArtifact, [60 * 60 * 24 * 7, idriss.address])) as SendToHash
+      sendToHash = (await waffle.deployContract(owner, SendToHashArtifact,
+         [60 * 60 * 24 * 7, idriss.address, mockPriceOracle.address])) as SendToHash
 
-      // unfortunately we can't use Promise.all, because transaction nonces got wrecked by concurrency
-      NFT_ID_ARRAY.forEach( async (val, idx, _) => { 
-         await mockNFT.safeMint(signer1Address, val)
-      })
-
+      Promise.all(
+         NFT_ID_ARRAY.map( async (val, idx, _) => { 
+            return mockNFT.safeMint(signer1Address, val)
+         })
+      )
    })
 
-   it('reverts sendToAnyone when value is zero', async () => {
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [])).to.be.revertedWith('Transferred value has to be bigger than 0')
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [])).to.be.revertedWith('Asset value has to be bigger than 0')
+   it('reverts sendToAnyone() when MATIC value is zero', async () => {
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [])).to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [])).to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [])).to.be.revertedWith('Value sent is smaller than minimal fee.')
    })
 
-   // it('returns expected URL for a token', async () => {
-   //    await sendToHash.safeMint(signer2Address, 'externalidx3', 3)
+   it ('reverts sendToAnyone() when an incorrect asset type is passed', async () => {
+      await expect(sendToHash.sendToAnyone('a', 0, 5, ZERO_ADDRESS, [])).to.be.reverted
+   })
 
-   //    expect("http://example.com/externalidx3").to.be.eq(await sendToHash.tokenURI(3))
-   //    await expect(sendToHash.tokenURI(1)).to.be.revertedWith('ERC721URIStorage: URI query for nonexistent token')
-   // })
+   it ('reverts sendToAnyone() when asset address is 0', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
+
+   it ('reverts sendToAnyone() when asset amount is 0', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
+
+   it ('reverts sendToAnyone() when NFT amount and assetIds array length doesn\'t match', async () => {
+      //TODO: implement
+   })
+
+   it ('reverts sendToAnyone() when declared and real amount of assets does not match', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
+
+   it ('properly handles asset address for MATIC transfer', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
+
+
+   it ('handle amounts in sendToAnyone() for MATIC transfer', async () => { const dollarInWei = await mockPriceOracle.dollarToWei()
+      const minimumAcceptablePayment = dollarInWei.add(1)
+      const minimumAcceptablePaymentNegated = BigNumber.from(`-${minimumAcceptablePayment.toString()}`)
+
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [], {value: dollarInWei}))
+         .to.be.revertedWith('Transferred value has to be bigger than 0')
+
+      await expect(await sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [], {value: minimumAcceptablePayment}))
+         .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
+
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(1)
+   })
+
+   it ('handle amounts in sendToAnyone() for single Token transfer', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [], {value: dollarInWei}))
+         .to.be.revertedWith('Transferred value has to be bigger than 0')
+
+      // await expect(await sendToHash.sendToAnyone('a', 3, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [], {value: dollarInWei}))
+         // .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
+
+      // expect(await sendToHash.balanceOf('a', ASSET_TYPE_TOKEN, ZERO_ADDRESS)).to.be.equal(1)
+   })
+
+   it ('handle amounts in sendToAnyone() for single NFT transfer', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [], {value: dollarInWei}))
+         .to.be.revertedWith('Transferred value has to be bigger than 0')
+
+      // await expect(await sendToHash.sendToAnyone('a', 3, ASSET_TYPE_NFT, ZERO_ADDRESS, [], {value: dollarInWei}))
+      //    .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
+
+      // expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, ZERO_ADDRESS)).to.be.equal(1)
+   })
+
+   it ('handle amounts in sendToAnyone() for multiple Token transfer of the same type', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
+
+   it ('handle amounts in sendToAnyone() for multiple Token transfer of many types', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
+
+   it ('handle amounts in sendToAnyone() for multiple NFT transfer of the same type', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
+
+   it ('handle amounts in sendToAnyone() for multiple NFT transfer of many types', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+   })
 })
