@@ -62,4 +62,13 @@ contract MaticPriceAggregatorV3Mock {
    function setPrice(int256 _price) external {
       price = _price;
    }
+
+    function dollarToWei() external view returns (uint256) {
+        (,int256 maticPrice,,,) = latestRoundData();
+        require (maticPrice > 0, "Unable to retrieve MATIC price.");
+
+        uint256 maticPriceMultiplier = 10**decimals();
+
+        return(10**18 * maticPriceMultiplier) / uint256(maticPrice);
+    }
 }
