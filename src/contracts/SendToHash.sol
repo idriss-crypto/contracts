@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
 import { ISendToHash } from "interfaces/ISendToHash.sol";
-import { IIDrissRegistry } from "interfaces/IIDrissRegistry.sol"
+import { IIDrissRegistry } from "interfaces/IIDrissRegistry.sol";
 import { AssetLiability } from "structs/IDrissStructs.sol";
 import { AssetType } from "enums/IDrissEnums.sol";
 
@@ -70,7 +70,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      *      It's best to approve contract by using non standard function just like
      *      `increaseAllowance` in OpenZeppelin to mitigate risk of race condition and double spend.
      */
-     //TODO: verify IDrissHash length
     function sendToAnyone (
         string memory _IDrissHash,
         uint256 _amount,
