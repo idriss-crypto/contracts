@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MockToken is ERC20{
+contract MockToken is ERC20 {
     constructor() ERC20("MockToken", "MCKT"){
         _mint(msg.sender,1000*10**18);
     }
@@ -21,6 +21,7 @@ contract MockNFT is ERC721, Ownable {
 
 contract IDriss {
     mapping(string => address) public IDrissOwnersMap;
+    mapping(string => string) public IDrissMap;
 
     constructor(address _secondAddress) {
         IDrissOwnersMap["a"] = msg.sender;
@@ -32,7 +33,7 @@ contract IDriss {
         external
         view
         returns (string memory) {
-            return "mock";
+            return IDrissMap[_hash];
         }
 
     function IDrissOwners(string memory _hash)
@@ -41,5 +42,9 @@ contract IDriss {
         returns (address) {
             return IDrissOwnersMap[_hash];
         }
+
+    function addIDriss(string memory _hash, string memory _address) external {
+            IDrissMap[_hash] = _address;
+    }
 }
 
