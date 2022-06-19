@@ -55,7 +55,7 @@ describe('SendToHash contract', () => {
       mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
       idriss = (await waffle.deployContract(owner, IDrissArtifact, [signer2Address])) as IDriss
       sendToHash = (await waffle.deployContract(owner, SendToHashArtifact,
-         [60 * 60 * 24 * 7, idriss.address, mockPriceOracle.address])) as SendToHash
+         [idriss.address, mockPriceOracle.address])) as SendToHash
 
       Promise.all(
          NFT_ID_ARRAY.map( async (val, idx, _) => { 
@@ -98,6 +98,24 @@ describe('SendToHash contract', () => {
    })
 
    it ('properly handles asset address for MATIC transfer', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+      expect(0).to.be.equal(1)
+   })
+
+   it ('properly handles fee on 95 cents', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+      expect(0).to.be.equal(1)
+   })
+
+   it ('properly handles fee on a 1$ transfer', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      //TODO: implement
+      expect(0).to.be.equal(1)
+   })
+
+   it ('properly handles fee above 1$ transfer', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       //TODO: implement
       expect(0).to.be.equal(1)
