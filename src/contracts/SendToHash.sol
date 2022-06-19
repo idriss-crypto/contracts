@@ -18,7 +18,6 @@ import { AssetLiability } from "./structs/IDrissStructs.sol";
 import { AssetType } from "./enums/IDrissEnums.sol";
 
 
-//TODO: add coin claimableUntil check
 //TODO: remove console.log after testing
 //TODO: move utils functions to library
 /**
@@ -38,11 +37,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
     AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
     address public immutable IDRISS_ADDR;
-    uint256 public immutable TRANSFER_EXPIRATION_IN_SECS;
-    uint256 public constant SINGLE_ASSET_PAYMENTS_LIMIT = 100;
-    uint256 public constant DISTINCT_NFT_TRANSFER_LIMIT = 1000;
     uint256 public constant PAYMENT_FEE_PERCENTAGE = 10;
     uint256 public constant PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
+    uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
     uint256 public paymentFeesBalance;
 
     event AssetTransferred(string indexed toHash, address indexed from,
@@ -53,12 +50,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address indexed assetContractAddress, uint256 amount);
 
     constructor(
-        uint256 _transferExpirationInSecs,
         address _IDrissAddr,
         address _maticUsdAggregator
     )
     {
-        TRANSFER_EXPIRATION_IN_SECS = _transferExpirationInSecs;
         IDRISS_ADDR = _IDrissAddr;
         MATIC_USD_PRICE_FEED = AggregatorV3Interface(_maticUsdAggregator);
     }
@@ -75,32 +70,19 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         uint256 _amount,
         AssetType _assetType,
         address _assetContractAddress,
-        uint256[] calldata _assetIds
+        uint256 _assetId
     ) external override nonReentrant() payable {
-        uint256 calculatedClaimableUntil = block.timestamp + TRANSFER_EXPIRATION_IN_SECS;
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value);
 
-        AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
-        AssetLiability memory payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
+        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        AssetLiability storage payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability memory incomingAssetLiability = AssetLiability({
             amount: _amount,
-            claimableUntil: calculatedClaimableUntil,
-            assetIds: _assetIds
+            assetIds: new uint256[](1)
         });
 
-
-        //TODO: think if this still holds true after adding minimal fee
-        // single asset type can hold only a limited amount of payments and NFTs to claim,
-        // to prevent micro transactions bloating, making claiming payments unprofitable
-        require (
-           beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].length < SINGLE_ASSET_PAYMENTS_LIMIT,
-           "Numer of pending payments for the asset reached its limit and has to be claimed to send more."
-        );
-        require (
-           beneficiaryAsset.assetIds.length + _assetIds.length < DISTINCT_NFT_TRANSFER_LIMIT,
-           "Numer of NFTs for a contract reached its limit and has to be claimed to send more."
-        );
+        incomingAssetLiability.assetIds[0] = _assetId;
 
         if (_assetType == AssetType.Coin) {
             _checkNonZeroValue(paymentValue, "Transferred value has to be bigger than 0");
@@ -110,9 +92,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
 
 
-        beneficiaryAsset = _mergeAsset(beneficiaryAsset, _amount, calculatedClaimableUntil, _assetIds);
-        payerAsset = _mergeAsset(payerAsset, _amount, calculatedClaimableUntil, _assetIds);
-
         if (_assetType == AssetType.Coin) {
             incomingAssetLiability.amount = paymentValue;
             beneficiaryAsset.amount += paymentValue;
@@ -121,48 +100,31 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             _sendTokenAssetFrom(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAsset(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
+            beneficiaryAsset.assetIds.push(_assetId);
+            payerAsset.assetIds.push(_assetId);
         }
 
         // state is modified after external calls, to avoid reentrancy attacks
-        beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress] = beneficiaryAsset;
-        payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress] = payerAsset;
+        beneficiaryAsset.amount += _amount;
+        payerAsset.amount += _amount;
         beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
         paymentFeesBalance += fee;
 
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, incomingAssetLiability.amount);
     }
 
-    function _mergeAsset (
-        AssetLiability memory _asset,
-        uint256 _amount,
-        uint256 _claimableUntil,
-        uint256 [] calldata _assetIds
-        ) internal pure returns (AssetLiability memory){
-            uint256 [] memory concatenatedAssetIds =
-                    new uint256[](_asset.assetIds.length + _assetIds.length);
-
-                for (uint256 i = 0; i < _asset.assetIds.length; i++) {
-                    concatenatedAssetIds[i] = _asset.assetIds[i];
-                }
-
-                for (uint256 i = 0; i < _assetIds.length; i++) {
-                    concatenatedAssetIds[i + _asset.assetIds.length] = _assetIds[i];
-                }
-
-            return AssetLiability({
-                amount: _asset.amount + _amount,
-                claimableUntil: _claimableUntil,
-                assetIds: concatenatedAssetIds
-            });
-    }
-
     function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
-        uint256 maticPrice = _dollarToWei();
+        uint256 dollarPriceInWei = _dollarToWei();
+        uint256 feeFromValue = (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
 
-        if ((_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR > maticPrice) {
-            fee = (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
+        if (feeFromValue > dollarPriceInWei) {
+            fee = feeFromValue;
+        // we accept slippage of matic price
+        } else if (_value >= dollarPriceInWei * 100 / (100 - PAYMENT_FEE_SLIPPAGE_PERCENT)
+                        && _value <= dollarPriceInWei) {
+            fee = _value;
         } else {
-            fee = maticPrice;
+            fee = dollarPriceInWei;
         }
 
         require (_value >= fee, "Value sent is smaller than minimal fee.");
@@ -386,4 +348,3 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
          || interfaceId == type(ISendToHash).interfaceId;
     }
 }
-

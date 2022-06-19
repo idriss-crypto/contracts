@@ -9,7 +9,7 @@ interface ISendToHash {
         uint256 _amount,
         AssetType _assetType,
         address _assetContractAddress,
-        uint256[] calldata _assetIds
+        uint256 _assetId
     ) external payable;
 
     function claim (

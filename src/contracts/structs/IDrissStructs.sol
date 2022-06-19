@@ -3,6 +3,5 @@ pragma solidity ^0.8.7;
 
 struct AssetLiability {
     uint256 amount;
-    uint256 claimableUntil;
     uint256[] assetIds;
 }
