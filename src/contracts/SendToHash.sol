@@ -87,7 +87,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         if (_assetType == AssetType.Coin) {
             _checkNonZeroValue(paymentValue, "Transferred value has to be bigger than 0");
         } else {
-            _checkNonZeroValue(incomingAssetLiability.amount, "Asset value has to be bigger than 0");
+            _checkNonZeroValue(incomingAssetLiability.amount, "Asset amount has to be bigger than 0");
             _checkNonZeroAddress(_assetContractAddress, "Asset address cannot be 0");
         }
 
@@ -220,7 +220,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address _to,
         address _contractAddress
     ) internal {
-        require(_asset.amount == _asset.assetIds.length, "Declared NFT amount is different from distinct NFT IDs list passed");
+        require(_asset.assetIds.length > 0, "Nothing to send");
 
         IERC721 nft = IERC721(_contractAddress);
         for (uint256 i = 0; i < _asset.assetIds.length; i++) {
