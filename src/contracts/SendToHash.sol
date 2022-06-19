@@ -120,7 +120,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         if (feeFromValue > dollarPriceInWei) {
             fee = feeFromValue;
         // we accept slippage of matic price
-        } else if (_value >= dollarPriceInWei * 100 / (100 - PAYMENT_FEE_SLIPPAGE_PERCENT)
+        } else if (_value >= dollarPriceInWei * (100 - PAYMENT_FEE_SLIPPAGE_PERCENT) / 100
                         && _value <= dollarPriceInWei) {
             fee = _value;
         } else {
