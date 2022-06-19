@@ -22,6 +22,10 @@ const ASSET_TYPE_TOKEN = 1
 const ASSET_TYPE_NFT = 2
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
+const negateBigNumber = (num: BigNumber): BigNumber => {
+      return BigNumber.from(`-${num.toString()}`)
+}
+
 describe('SendToHash contract', () => {
    let owner: Signer;
    let signer1: Signer;
@@ -65,192 +69,229 @@ describe('SendToHash contract', () => {
    })
 
    it('reverts sendToAnyone() when MATIC value is zero', async () => {
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [])).to.be.revertedWith('Value sent is smaller than minimal fee.')
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [])).to.be.revertedWith('Value sent is smaller than minimal fee.')
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [])).to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0)).to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0)).to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, 0)).to.be.revertedWith('Value sent is smaller than minimal fee.')
    })
 
    it ('reverts sendToAnyone() when an incorrect asset type is passed', async () => {
-      await expect(sendToHash.sendToAnyone('a', 0, 5, ZERO_ADDRESS, [])).to.be.reverted
+      await expect(sendToHash.sendToAnyone('a', 0, 5, ZERO_ADDRESS, 0)).to.be.reverted
    })
 
    it ('reverts sendToAnyone() when asset address is 0', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
+
+      await expect(sendToHash.sendToAnyone('a', 1, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0, {value: dollarInWei}))
+         .to.be.revertedWith('Asset address cannot be 0')
+      await expect(sendToHash.sendToAnyone('a', 1, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, {value: dollarInWei}))
+         .to.be.revertedWith('Asset address cannot be 0')
    })
 
    it ('reverts sendToAnyone() when asset amount is 0', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
+
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+         .to.be.revertedWith('Asset amount has to be bigger than 0')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei}))
+         .to.be.revertedWith('Asset amount has to be bigger than 0')
    })
 
-   it ('reverts sendToAnyone() when NFT amount and assetIds array length doesn\'t match', async () => {
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
-
-   it ('reverts sendToAnyone() when declared and real amount of assets does not match', async () => {
+   it ('reverts sendToAnyone() when receiver does not have allowance for a token', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
+
+      await mockToken.transfer(signer1Address, 5)
+      expect(await mockToken.balanceOf(signer1Address)).to.be.equal(5)
+
+      await mockToken.connect(signer1).approve(sendToHash.address, 5)
+      expect(await mockToken.allowance(signer1Address, sendToHash.address)).to.be.equal(5)
+
+      await expect(sendToHash.connect(signer1).sendToAnyone('b', 10, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+         .to.be.revertedWith('ERC20: insufficient allowance')
+   })
+
+   it ('reverts sendToAnyone() when sender is not allowed to send an NFT', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+
+      await expect(sendToHash.connect(signer1).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+         .to.be.revertedWith('Receiver is not approved to receive the NFT')
    })
 
    it ('properly handles asset address for MATIC transfer', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
+      const payments = [dollarInWei.add(100), dollarInWei.add(2500), dollarInWei.add(968)]
+
+      expect(await sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, mockToken.address, 0, {value: payments[0]}))
+         .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payments[0]), payments[0]])
+
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(100)
+
+      expect(await sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, mockNFT.address, 0, {value: payments[1]}))
+         .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payments[1]), payments[1]])
+
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_COIN, mockToken.address)).to.be.equal(100 + 2500)
+
+      expect(await sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: payments[2]}))
+         .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payments[2]), payments[2]])
+
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_COIN, mockNFT.address)).to.be.equal(100 + 2500 + 968)
    })
 
-   it ('properly handles fee on 95 cents', async () => {
+   // it ('properly handles oracle price changes', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
+
+   // it ('properly handles fee on 95 cents', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
+
+   // it ('properly handles fee on a 1$ transfer', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
+
+   // it ('properly handles fee above 1$ transfer', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
+
+   it ('properly handles amounts in sendToAnyone() for MATIC transfer', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
-
-   it ('properly handles fee on a 1$ transfer', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
-
-   it ('properly handles fee above 1$ transfer', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
-
-   it ('properly handles amounts in sendToAnyone() for MATIC transfer', async () => { const dollarInWei = await mockPriceOracle.dollarToWei()
       const minimumAcceptablePayment = dollarInWei.add(1)
-      const minimumAcceptablePaymentNegated = BigNumber.from(`-${minimumAcceptablePayment.toString()}`)
+      const minimumAcceptablePaymentNegated = negateBigNumber(minimumAcceptablePayment)
 
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [], {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: dollarInWei}))
          .to.be.revertedWith('Transferred value has to be bigger than 0')
 
-      await expect(await sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, [], {value: minimumAcceptablePayment}))
+      await expect(await sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: minimumAcceptablePayment}))
          .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
 
       expect(await sendToHash.balanceOf('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(1)
    })
 
-   it ('properly handles amounts in sendToAnyone() for single Token transfer', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
+   // it ('properly handles amounts in sendToAnyone() for single Token transfer', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [], {value: dollarInWei}))
-         .to.be.revertedWith('Transferred value has to be bigger than 0')
+   //    await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0, {value: dollarInWei}))
+   //       .to.be.revertedWith('Transferred value has to be bigger than 0')
 
-      // await expect(await sendToHash.sendToAnyone('a', 3, ASSET_TYPE_TOKEN, ZERO_ADDRESS, [], {value: dollarInWei}))
-         // .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
+   //    // await expect(await sendToHash.sendToAnyone('a', 3, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0, {value: dollarInWei}))
+   //       // .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
 
-      // expect(await sendToHash.balanceOf('a', ASSET_TYPE_TOKEN, ZERO_ADDRESS)).to.be.equal(1)
-   })
+   //    // expect(await sendToHash.balanceOf('a', ASSET_TYPE_TOKEN, ZERO_ADDRESS)).to.be.equal(1)
+   // })
 
-   it ('properly handles amounts in sendToAnyone() for single NFT transfer', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
+   // it ('properly handles amounts in sendToAnyone() for single NFT transfer', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, [], {value: dollarInWei}))
-         .to.be.revertedWith('Transferred value has to be bigger than 0')
+   //    await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, {value: dollarInWei}))
+   //       .to.be.revertedWith('Transferred value has to be bigger than 0')
 
-      // await expect(await sendToHash.sendToAnyone('a', 3, ASSET_TYPE_NFT, ZERO_ADDRESS, [], {value: dollarInWei}))
-      //    .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
+   //    // await expect(await sendToHash.sendToAnyone('a', 3, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, {value: dollarInWei}))
+   //    //    .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
 
-      // expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, ZERO_ADDRESS)).to.be.equal(1)
-   })
+   //    // expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, ZERO_ADDRESS)).to.be.equal(1)
+   // })
 
-   it ('properly handles amounts in sendToAnyone() for multiple Token transfer of the same type', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles amounts in sendToAnyone() for multiple Token transfer of the same type', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('properly handles assets for multiple asset transfers', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles assets for multiple asset transfers', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('properly handles assets for multiple asset transfers and reversals', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles assets for multiple asset transfers and reversals', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('properly handles amounts in sendToAnyone() for multiple Token transfer of many types', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles amounts in sendToAnyone() for multiple Token transfer of many types', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('properly handles amounts in sendToAnyone() for multiple NFT transfer of the same type', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles amounts in sendToAnyone() for multiple NFT transfer of the same type', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('properly handles amounts in sendToAnyone() for multiple NFT transfer of many types', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles amounts in sendToAnyone() for multiple NFT transfer of many types', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('prevents reentrancy attacks', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('prevents reentrancy attacks', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('allows transfering all fees earned by the contract to the owner', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('allows transfering all fees earned by the contract to the owner', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('reverts revertPayment() when there is nothing to revert', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('reverts revertPayment() when there is nothing to revert', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('reverts revertPayment() when trying go revert payment second time', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('reverts revertPayment() when trying go revert payment second time', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('properly handles successful revertPayment()', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles successful revertPayment()', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('reverts claim() when there is nothing to claim', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('reverts claim() when there is nothing to claim', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('reverts claim() when IDriss hash does not resolve to proper address', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('reverts claim() when IDriss hash does not resolve to proper address', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('properly handles successful claim()', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('properly handles successful claim()', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('reverts claim() when trying go claim payment for second time', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('reverts claim() when trying go claim payment for second time', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 
-   it ('emits events on successful function invocations', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
+   // it ('emits events on successful function invocations', async () => {
+   //    const dollarInWei = await mockPriceOracle.dollarToWei()
+   //    //TODO: implement
+   //    expect(0).to.be.equal(1)
+   // })
 })
+
