@@ -18,7 +18,6 @@ import { AssetLiability } from "./structs/IDrissStructs.sol";
 import { AssetType } from "./enums/IDrissEnums.sol";
 
 
-//TODO: remove console.log after testing
 //TODO: move utils functions to library
 /**
  * @title sendToHash
@@ -185,18 +184,23 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].amount;
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        AssetLiability memory beneficiaryAssetForTransfer = AssetLiability ({
+            amount: beneficiaryAsset.amount,
+            assetIds: beneficiaryAsset.assetIds
+        });
 
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
 
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
+        //TODO: pop assetIds from beneficiary
         beneficiaryAsset.amount -= amountToRevert;
 
         if (_assetType == AssetType.Coin) {
             _sendCoin(msg.sender, amountToRevert);
         } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(beneficiaryAsset, address(this), msg.sender, _assetContractAddress);
+            _sendNFTAsset(beneficiaryAssetForTransfer, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.Token) {
-            _sendTokenAsset(beneficiaryAsset, msg.sender, _assetContractAddress);
+            _sendTokenAsset(beneficiaryAssetForTransfer, msg.sender, _assetContractAddress);
         }
 
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert);
@@ -224,7 +228,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         IERC721 nft = IERC721(_contractAddress);
         for (uint256 i = 0; i < _asset.assetIds.length; i++) {
-            require(nft.getApproved(_asset.assetIds[i]) == _to, "Receiver is not approved to receive the NFT");
             nft.safeTransferFrom(_from, _to, _asset.assetIds[i], "");
         }
     }
@@ -338,11 +341,11 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address,
         uint256,
         bytes calldata
-    ) external override returns (bytes4) {
+    ) external override pure returns (bytes4) {
        return IERC721Receiver.onERC721Received.selector;
     }
 
-    function supportsInterface (bytes4 interfaceId) public view override returns (bool) {
+    function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {
         return interfaceId == type(IERC165).interfaceId
          || interfaceId == type(IERC721Receiver).interfaceId
          || interfaceId == type(ISendToHash).interfaceId;
