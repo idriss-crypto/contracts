@@ -87,8 +87,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
 
         if (_assetType == AssetType.Coin) {
-            beneficiaryAsset.amount += paymentValue;
-            payerAsset.amount += paymentValue;
             _amount = paymentValue;
         } else if (_assetType == AssetType.Token) {
             _sendTokenAssetFrom(_amount, msg.sender, address(this), _assetContractAddress);
