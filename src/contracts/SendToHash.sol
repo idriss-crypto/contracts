@@ -76,31 +76,28 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability storage payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
-        AssetLiability memory incomingAssetLiability = AssetLiability({
-            amount: _amount,
-            assetIds: new uint256[](1)
-        });
 
-        incomingAssetLiability.assetIds[0] = _assetId;
 
         if (_assetType == AssetType.Coin) {
             _checkNonZeroValue(paymentValue, "Transferred value has to be bigger than 0");
         } else {
-            _checkNonZeroValue(incomingAssetLiability.amount, "Asset amount has to be bigger than 0");
+            _checkNonZeroValue(_amount, "Asset amount has to be bigger than 0");
             _checkNonZeroAddress(_assetContractAddress, "Asset address cannot be 0");
         }
 
 
         if (_assetType == AssetType.Coin) {
-            incomingAssetLiability.amount = paymentValue;
             beneficiaryAsset.amount += paymentValue;
             payerAsset.amount += paymentValue;
+            _amount = paymentValue;
         } else if (_assetType == AssetType.Token) {
-            _sendTokenAssetFrom(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
+            _sendTokenAssetFrom(_amount, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(incomingAssetLiability, msg.sender, address(this), _assetContractAddress);
-            beneficiaryAsset.assetIds.push(_assetId);
-            payerAsset.assetIds.push(_assetId);
+            uint256 [] memory assetIds = new uint[](1);
+            assetIds[0] = _assetId;
+            _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
+            beneficiaryAsset.assetIds[msg.sender].push(_assetId);
+            payerAsset.assetIds[msg.sender].push(_assetId);
         }
 
         // state is modified after external calls, to avoid reentrancy attacks
@@ -109,7 +106,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
         paymentFeesBalance += fee;
 
-        emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, incomingAssetLiability.amount);
+        emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
     }
 
     function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
@@ -141,27 +138,31 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     ) external override nonReentrant() {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
-        AssetLiability memory beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
         address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        uint256 amountToClaim = beneficiaryAsset.amount;
 
-        _checkNonZeroValue(beneficiaryAsset.amount, "Nothing to claim.");
-
-        delete beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        _checkNonZeroValue(amountToClaim, "Nothing to claim.");
 
         for (uint256 i = 0; i < payers.length; i++) {
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].pop();
             delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress];
+            if (_assetType == AssetType.NFT) {
+                uint256[] memory assetIds = beneficiaryAsset.assetIds[payers[i]];
+                delete beneficiaryAsset.assetIds[payers[i]];
+                _sendNFTAsset(assetIds, address(this), ownerIDrissAddr, _assetContractAddress);
+            }
         }
+
+        delete beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
 
         if (_assetType == AssetType.Coin) {
-            _sendCoin(ownerIDrissAddr, beneficiaryAsset.amount);
-        } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(beneficiaryAsset, address(this), ownerIDrissAddr, _assetContractAddress);
+            _sendCoin(ownerIDrissAddr, amountToClaim);
         } else if (_assetType == AssetType.Token) {
-            _sendTokenAsset(beneficiaryAsset, ownerIDrissAddr, _assetContractAddress);
+            _sendTokenAsset(amountToClaim, ownerIDrissAddr, _assetContractAddress);
         }
 
-        emit AssetClaimed(_IDrissHash, ownerIDrissAddr, adjustedAssetAddress, beneficiaryAsset.amount);
+        emit AssetClaimed(_IDrissHash, ownerIDrissAddr, adjustedAssetAddress, amountToClaim);
     }
 
     function balanceOf (
@@ -184,10 +185,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].amount;
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
-        AssetLiability memory beneficiaryAssetForTransfer = AssetLiability ({
-            amount: beneficiaryAsset.amount,
-            assetIds: beneficiaryAsset.assetIds
-        });
 
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
 
@@ -197,11 +194,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         if (_assetType == AssetType.Coin) {
             _sendCoin(msg.sender, amountToRevert);
-        } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(beneficiaryAssetForTransfer, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.Token) {
-            _sendTokenAsset(beneficiaryAssetForTransfer, msg.sender, _assetContractAddress);
-        }
+            _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
+        } else if (_assetType == AssetType.NFT) {
+            uint256[] memory assetIds = beneficiaryAsset.assetIds[msg.sender];
+            delete beneficiaryAsset.assetIds[msg.sender];
+            _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
+        } 
 
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert);
     }
@@ -219,39 +218,39 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     }
 
     function _sendNFTAsset (
-        AssetLiability memory _asset,
+        uint256[] memory _assetIds,
         address _from,
         address _to,
         address _contractAddress
     ) internal {
-        require(_asset.assetIds.length > 0, "Nothing to send");
+        require(_assetIds.length > 0, "Nothing to send");
 
         IERC721 nft = IERC721(_contractAddress);
-        for (uint256 i = 0; i < _asset.assetIds.length; i++) {
-            nft.safeTransferFrom(_from, _to, _asset.assetIds[i], "");
+        for (uint256 i = 0; i < _assetIds.length; i++) {
+            nft.safeTransferFrom(_from, _to, _assetIds[i], "");
         }
     }
 
     function _sendTokenAsset (
-        AssetLiability memory _asset,
+        uint256 _amount,
         address _to,
         address _contractAddress
     ) internal {
         IERC20 token = IERC20(_contractAddress);
 
-        bool sent = token.transfer(_to, _asset.amount);
+        bool sent = token.transfer(_to, _amount);
         require(sent, "Failed to transfer token");
     }
 
     function _sendTokenAssetFrom (
-        AssetLiability memory _asset,
+        uint256 _amount,
         address _from,
         address _to,
         address _contractAddress
     ) internal {
         IERC20 token = IERC20(_contractAddress);
 
-        bool sent = token.transferFrom(_from, _to, _asset.amount);
+        bool sent = token.transferFrom(_from, _to, _amount);
         require(sent, "Failed to transfer token");
     }
 
