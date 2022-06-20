@@ -271,6 +271,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         returns (address IDrissAddress)
     {
         string memory IDrissString = IIDrissRegistry(IDRISS_ADDR).getIDriss(_IDrissHash);
+        require(bytes(IDrissString).length > 0, "IDriss not found.");
         IDrissAddress = _safeHexStringToAddress(IDrissString);
         _checkNonZeroAddress(IDrissAddress, "Address for the IDriss hash cannot resolve to 0x0");
     }
@@ -299,7 +300,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         bytes memory _bytes = new bytes(ss.length / 2);
         address resultAddress;
 
-        for (uint256 i = 0; i < ss.length / 2; i++) {
+        for (uint256 i = 1; i < ss.length / 2; i++) {
             _bytes[i] = bytes1(_fromHexChar(uint8(ss[2*i])) * 16 +
                         _fromHexChar(uint8(ss[2*i+1])));
         }
