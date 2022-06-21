@@ -43,7 +43,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
     event AssetTransferred(string indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
-    event AssetClaimed(string indexed toHash, address indexed from,
+    event AssetClaimed(string indexed toHash, address indexed beneficiary,
         address indexed assetContractAddress, uint256 amount);
     event AssetTransferReverted(string indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
@@ -141,7 +141,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         uint256 amountToClaim = beneficiaryAsset.amount;
 
         _checkNonZeroValue(amountToClaim, "Nothing to claim.");
+        require(ownerIDrissAddr == msg.sender, "Only owner can claim payments.");
 
+//TODO: check if it works as expected
         for (uint256 i = 0; i < payers.length; i++) {
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].pop();
             delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress];
