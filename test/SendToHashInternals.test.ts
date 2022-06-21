@@ -55,6 +55,11 @@ describe('SendToHashMock contract', () => {
       idriss = (await waffle.deployContract(owner, IDrissArtifact, [signer2Address])) as IDriss
       sendToHashMock = (await waffle.deployContract(owner, SendToHashArtifact,
          [idriss.address, mockPriceOracle.address])) as SendToHashMock
+
+      idriss.addIDriss('a', signer1Address)
+      idriss.addIDriss('b', signer2Address)
+      idriss.addIDriss('c', signer3Address)
+      idriss.addIDriss('0', ZERO_ADDRESS)
    })
 
    it ('properly calculates fee for a payment', async () => {
@@ -97,6 +102,61 @@ describe('SendToHashMock contract', () => {
 
       expect(fee6).to.be.equal(dollarInWei.mul(12))
       expect(value6).to.be.equal(dollarInWei.mul(1188))
+   })
+
+   it ('properly translates characters to bytes', async () => {
+      for(let i = 0; i < 10; i++) {
+         expect(await sendToHashMock.fromHexChar('0'.charCodeAt(0) + i)).to.be.equal(i)
+      }
+
+      for(let i = 0; i < 6; i++) {
+         expect(await sendToHashMock.fromHexChar('a'.charCodeAt(0) + i)).to.be.equal(10 + i)
+         expect(await sendToHashMock.fromHexChar('A'.charCodeAt(0) + i)).to.be.equal(10 + i)
+      }
+
+      for (let c of ['X', 'x', 't', 'G', '#', '@', '(']) {
+         await expect(sendToHashMock.fromHexChar(c.charCodeAt(0)))
+            .to.be.revertedWith('Unparseable hex character found in address.')
+      }
+   })
+
+   it ('properly translates address string to address bytes', async () => {
+      expect(await sendToHashMock.safeHexStringToAddress(signer1Address)).to.be.equal(signer1Address)
+      expect(await sendToHashMock.safeHexStringToAddress(signer2Address)).to.be.equal(signer2Address)
+      expect(await sendToHashMock.safeHexStringToAddress(signer3Address)).to.be.equal(signer3Address)
+
+      //TODO: check why it doesn't work
+      // await expect(sendToHashMock.safeHexStringToAddress(ZERO_ADDRESS))
+      //    .to.be.revertedWith('Address for the IDriss hash cannot resolve to 0x0')
+
+      await expect(sendToHashMock.safeHexStringToAddress("0xaf5a"))
+         .to.be.revertedWith('Address length is invalid')
+
+      await expect(sendToHashMock.safeHexStringToAddress("0xaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5aaf5a"))
+         .to.be.revertedWith('Address length is invalid')
+
+      await expect(sendToHashMock.safeHexStringToAddress( '0x0000000000kkkkkkkkkkkk000000HZGRRRRRRR00'))
+         .to.be.revertedWith('Unparseable hex character found in address.')
+   })
+
+   it ('properly handles translating IDriss hash to address', async () => {
+      const testHashes: any = {}
+      testHashes['test1'] = signer1Address
+      testHashes['test2'] = signer2Address
+      testHashes['test3'] = signer3Address
+
+      for (let key in testHashes) {
+         const value = testHashes[key]
+         await idriss.addIDriss(key, value)
+         expect(await sendToHashMock.getAddressFromHash(key)).to.be.equal(value)
+      }
+
+      await idriss.addIDriss('test4', ZERO_ADDRESS)
+      await expect(sendToHashMock.getAddressFromHash('test4'))
+         .to.be.revertedWith('Address for the IDriss hash cannot resolve to 0x0')
+
+      await expect(sendToHashMock.getAddressFromHash('nonexistent'))
+         .to.be.revertedWith('IDriss not found.')
    })
 
    // it ('properly handles removal of assetIds from an array after claiming', async () => {
