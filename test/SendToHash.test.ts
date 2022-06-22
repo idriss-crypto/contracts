@@ -78,9 +78,12 @@ describe('SendToHash contract', () => {
    })
 
    it('reverts sendToAnyone() when MATIC value is zero', async () => {
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0)).to.be.revertedWith('Value sent is smaller than minimal fee.')
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0)).to.be.revertedWith('Value sent is smaller than minimal fee.')
-      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, 0)).to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0))
+         .to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0))
+         .to.be.revertedWith('Value sent is smaller than minimal fee.')
+      await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_NFT, ZERO_ADDRESS, 0))
+         .to.be.revertedWith('Value sent is smaller than minimal fee.')
    })
 
    it ('reverts sendToAnyone() when an incorrect asset type is passed', async () => {
@@ -122,7 +125,7 @@ describe('SendToHash contract', () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
       await expect(sendToHash.connect(signer1).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
-         .to.be.revertedWith('Receiver is not approved to receive the NFT')
+         .to.be.revertedWith('ERC721: transfer caller is not owner nor approved')
    })
 
    it ('properly handles asset address for MATIC transfer', async () => {
