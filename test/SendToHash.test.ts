@@ -71,8 +71,8 @@ describe('SendToHash contract', () => {
 
       Promise.all(
          NFT_ID_ARRAY.map( async (val, idx, _) => { 
-            await mockNFT.safeMint(ownerAddress, val)
-            return mockNFT2.safeMint(ownerAddress, val)
+            await mockNFT.safeMint(ownerAddress, val).catch(e => {})
+            return mockNFT2.safeMint(ownerAddress, val).catch(e => {})
          })
       )
    })
@@ -92,7 +92,7 @@ describe('SendToHash contract', () => {
 
    it ('reverts sendToAnyone() when asset address is 0', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-
+      
       await expect(sendToHash.sendToAnyone('a', 1, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0, {value: dollarInWei}))
          .to.be.revertedWith('Asset address cannot be 0')
       await expect(sendToHash.sendToAnyone('a', 1, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, {value: dollarInWei}))
