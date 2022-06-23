@@ -23,10 +23,9 @@ contract IDriss {
     mapping(string => address) public IDrissOwnersMap;
     mapping(string => string) public IDrissMap;
 
-    constructor(address _secondAddress) {
+    constructor() {
         IDrissOwnersMap["a"] = msg.sender;
-        IDrissOwnersMap["b"] = _secondAddress;
-        IDrissOwnersMap["c"] = address(0);
+        IDrissOwnersMap["b"] = address(0);
     }
 
     function getIDriss(string memory _hash)

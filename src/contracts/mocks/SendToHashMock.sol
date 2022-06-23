@@ -4,6 +4,7 @@ pragma solidity ^0.8.7;
 import { ISendToHash } from "../interfaces/ISendToHash.sol";
 import { SendToHash } from "../SendToHash.sol"; 
 import { IIDrissRegistry } from "../interfaces/IIDrissRegistry.sol";
+import { AssetLiability } from "../structs/IDrissStructs.sol";
 import { AssetType } from "../enums/IDrissEnums.sol";
 
 /**
@@ -49,5 +50,57 @@ contract SendToHashMock is SendToHash {
 
     function dollarToWei() external view returns (uint256) {
         return _dollarToWei();
+    }
+
+
+
+    // mapping(address => mapping(string => mapping(AssetType => mapping(address => AssetLiability)))) payerAssetMap;
+    // mapping(string => mapping(AssetType => mapping(address => AssetLiability))) beneficiaryAssetMap;
+    // mapping(string => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersMap;
+
+    function getPayerAssetMapAmount(
+        address _payerAddress,
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress) external view returns (uint256) {
+            return payerAssetMap[_payerAddress][_IDrissHash][_assetType][_assetContractAddress].amount;
+    }
+
+    function getPayerAssetMapAssetIds(
+        address _payerAddress,
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress) external view returns (uint256[] memory) {
+            return payerAssetMap[_payerAddress][_IDrissHash][_assetType][_assetContractAddress].assetIds[_payerAddress];
+    }
+
+    function getBeneficiaryMapAmount(
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress) external view returns (uint256) {
+            return beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress].amount;
+    }
+
+    function getBeneficiaryMapAssetIds(
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress,
+        address _payerAddress) external view returns (uint256[] memory) {
+            return beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress].assetIds[_payerAddress];
+    }
+
+    function getBeneficiaryPayersArray(
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress) external view returns (address[] memory) {
+            return beneficiaryPayersArray[_IDrissHash][_assetType][_assetContractAddress];
+    }
+
+    function getBeneficiaryPayersMap(
+        address _payerAddress,
+        string memory _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress) external view returns (bool) {
+            return beneficiaryPayersMap[_IDrissHash][_assetType][_assetContractAddress][_payerAddress];
     }
 }

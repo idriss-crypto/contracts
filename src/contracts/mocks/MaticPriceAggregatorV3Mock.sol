@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-//TODO: check how matic Oracle works
 contract MaticPriceAggregatorV3Mock {
    int256 price = 36662934;
   function decimals() public view returns (uint8) {
