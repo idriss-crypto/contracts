@@ -106,7 +106,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         payerAsset.amount += _amount;
         paymentFeesBalance += fee;
 
-        if(false == beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender]) {
+        if (false == beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender]) {
             beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
         }
@@ -191,6 +191,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     ) external override nonReentrant() {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256 amountToRevert = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].amount;
+        uint256[] memory assetIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
 
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
@@ -198,12 +199,24 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
         beneficiaryAsset.amount -= amountToRevert;
 
+        address [] storage payers = beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress];
+
+        for (uint256 i = 0; i < payers.length; i++) {
+            if (msg.sender == payers[i]) {
+                delete beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][payers[i]];
+                if (_assetType == AssetType.NFT) {
+                    delete beneficiaryAsset.assetIds[payers[i]];
+                }
+                payers[i] = payers[payers.length - 1];
+                payers.pop();
+            }
+        }
+
         if (_assetType == AssetType.Coin) {
             _sendCoin(msg.sender, amountToRevert);
         } else if (_assetType == AssetType.Token) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            uint256[] memory assetIds = beneficiaryAsset.assetIds[msg.sender];
             delete beneficiaryAsset.assetIds[msg.sender];
             _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
         } 
