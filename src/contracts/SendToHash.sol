@@ -32,7 +32,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     // beneficiaryHash => assetType => assetAddress => AssetLiability
     mapping(string => mapping(AssetType => mapping(address => AssetLiability))) beneficiaryAssetMap;
     // beneficiaryHash => assetType => assetAddress => payer[]
-    mapping(string => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersMap;
+    mapping(string => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersArray;
+    // beneficiaryHash => assetType => assetAddress => payer => didPay
+    mapping(string => mapping(AssetType => mapping(address => mapping(address => bool)))) beneficiaryPayersMap;
 
     AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
     address public immutable IDRISS_ADDR;
@@ -83,6 +85,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else {
             _checkNonZeroValue(_amount, "Asset amount has to be bigger than 0");
             _checkNonZeroAddress(_assetContractAddress, "Asset address cannot be 0");
+            require(_isContract(_assetContractAddress), "Asset address is not a contract");
         }
 
 
@@ -101,8 +104,12 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         // state is modified after external calls, to avoid reentrancy attacks
         beneficiaryAsset.amount += _amount;
         payerAsset.amount += _amount;
-        beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
         paymentFeesBalance += fee;
+
+        if(false == beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender]) {
+            beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
+            beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
+        }
 
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
     }
@@ -137,16 +144,16 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
-        address [] memory payers = beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        address [] memory payers = beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress];
         uint256 amountToClaim = beneficiaryAsset.amount;
 
         _checkNonZeroValue(amountToClaim, "Nothing to claim.");
         require(ownerIDrissAddr == msg.sender, "Only owner can claim payments.");
 
-//TODO: check if it works as expected
         for (uint256 i = 0; i < payers.length; i++) {
-            beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress].pop();
+            beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].pop();
             delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress];
+            delete beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][payers[i]];
             if (_assetType == AssetType.NFT) {
                 uint256[] memory assetIds = beneficiaryAsset.assetIds[payers[i]];
                 delete beneficiaryAsset.assetIds[payers[i]];
@@ -189,7 +196,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
 
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
-        //TODO: pop assetIds from beneficiary
         beneficiaryAsset.amount -= amountToRevert;
 
         if (_assetType == AssetType.Coin) {
@@ -252,6 +258,19 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         bool sent = token.transferFrom(_from, _to, _amount);
         require(sent, "Failed to transfer token");
+    }
+
+    /**
+    * @notice Check if an address is a deployed contract
+    * @dev IMPORTANT!! This function is used for very specific reason, i.e. to check
+    *      if ERC20 or ERC721 is already deployed before trying to interact with it.
+    *      It should not be used to detect if msg.sender is an user, as any code run
+    *      in a contructor has code size of 0
+    */    
+    function _isContract(address addr) internal view returns (bool) {
+        uint size;
+        assembly { size := extcodesize(addr) }
+        return size > 0;
     }
 
     /**
