@@ -23,6 +23,9 @@ const config: HardhatUserConfig = {
     artifacts: 'src/artifacts',
     sources: 'src/contracts'
   },
+  mocha: {
+    timeout: 100000000000
+  },
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {
