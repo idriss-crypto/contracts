@@ -35,6 +35,10 @@ const config: HardhatUserConfig = {
     ganache: {
       chainId: 1337, //event though config says it's 5777
       url: "http://127.0.0.1:7545",
+    },
+    hardhat_node: {
+      chainId: 1337,
+      url: "http://127.0.0.1:8545",
     }
   }
 }
