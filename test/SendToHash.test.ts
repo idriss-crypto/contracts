@@ -21,6 +21,7 @@ const ASSET_TYPE_COIN = 0
 const ASSET_TYPE_TOKEN = 1
 const ASSET_TYPE_NFT = 2
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+const NFT_ID_ARRAY = [... Array(10).keys()]
 
 const negateBigNumber = (num: BigNumber): BigNumber => {
       return BigNumber.from(`-${num.toString()}`)
@@ -42,7 +43,6 @@ describe('SendToHash contract', () => {
    let mockNFT: MockNFT
    let mockNFT2: MockNFT
    let mockPriceOracle: MaticPriceAggregatorV3Mock
-   let NFT_ID_ARRAY = [... Array(10).keys()]
    let provider: MockProvider
 
    beforeEach(async () => {
@@ -61,7 +61,7 @@ describe('SendToHash contract', () => {
       mockNFT = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
       mockNFT2 = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
       mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
-      idriss = (await waffle.deployContract(owner, IDrissArtifact, [signer2Address])) as IDriss
+      idriss = (await waffle.deployContract(owner, IDrissArtifact, [])) as IDriss
       sendToHash = (await waffle.deployContract(owner, SendToHashArtifact,
          [idriss.address, mockPriceOracle.address])) as SendToHash
 
@@ -97,6 +97,13 @@ describe('SendToHash contract', () => {
          .to.be.revertedWith('Asset address cannot be 0')
       await expect(sendToHash.sendToAnyone('a', 1, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, {value: dollarInWei}))
          .to.be.revertedWith('Asset address cannot be 0')
+   })
+
+   it ('reverts sendToAnyone() when assetContractAddress is not an existing contract', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+
+      await expect(sendToHash.sendToAnyone('a', 1, ASSET_TYPE_NFT, signer1Address, 0, {value: dollarInWei}))
+         .to.be.revertedWith('Asset address is not a contract')
    })
 
    it ('reverts sendToAnyone() when asset amount is 0', async () => {
@@ -631,12 +638,6 @@ describe('SendToHash contract', () => {
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
    })
 
-   it ('prevents reentrancy attacks', async () => {
-      const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
-      expect(0).to.be.equal(1)
-   })
-
    it ('allows transfering all fees earned by the contract to the owner', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       const payment = dollarInWei.add(2340000)
@@ -699,20 +700,17 @@ describe('SendToHash contract', () => {
    it ('properly handles adding and reverting/claiming the same NFT over and over again', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      for (let i of [...Array(10).keys()]) {
+      for (let i = 0; i < 10; i++) {
          await mockNFT.approve(sendToHash.address, 1)
-         console.countReset()
 
          await expect(() => sendToHash.sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
             .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
          expect(await mockNFT.ownerOf(1)).to.be.equal(sendToHash.address)
 
-         console.count()
          await expect(() => sendToHash.revertPayment('a', ASSET_TYPE_NFT, mockNFT.address))
             .to.changeTokenBalances(mockNFT, [owner, sendToHash], [1, -1])
 
-         console.count()
          expect(await mockNFT.ownerOf(1)).to.be.equal(ownerAddress)
 
          await mockNFT.approve(sendToHash.address, 1)
@@ -720,24 +718,49 @@ describe('SendToHash contract', () => {
          await expect(() => sendToHash.sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
             .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-         console.count()
          expect(await mockNFT.ownerOf(1)).to.be.equal(sendToHash.address)
          expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
-
-         console.count()
+         expect(await idriss.getIDriss('a')).to.be.equal(signer1Address)
          await expect(() => sendToHash.connect(signer1).claim('a', ASSET_TYPE_NFT, mockNFT.address))
             .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [1, -1])
 
          expect(await mockNFT.ownerOf(1)).to.be.equal(signer1Address)
 
-         console.count()
          await mockNFT.connect(signer1).transferFrom(signer1Address, ownerAddress, 1)
       }
    })
 
    it ('properly handles adding and reverting/claiming the same token over and over again', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      //TODO: implement
+
+      for (let i = 0; i < 10; i++) {
+         await mockToken.approve(sendToHash.address, 50)
+
+         await expect(() => sendToHash.sendToAnyone('a', 50, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+            .to.changeTokenBalances(mockToken, [owner, sendToHash], [-50, 50])
+
+         expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(50)
+
+         await expect(() => sendToHash.revertPayment('a', ASSET_TYPE_TOKEN, mockToken.address))
+            .to.changeTokenBalances(mockToken, [owner, sendToHash], [50, -50])
+
+         expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(0)
+
+         await mockToken.approve(sendToHash.address, 150)
+
+         await expect(() => sendToHash.sendToAnyone('a', 150, ASSET_TYPE_TOKEN, mockToken.address, 1, {value: dollarInWei}))
+            .to.changeTokenBalances(mockToken, [owner, sendToHash], [-150, 150])
+
+         expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(150)
+         expect(await idriss.getIDriss('a')).to.be.equal(signer1Address)
+         await expect(() => sendToHash.connect(signer1).claim('a', ASSET_TYPE_TOKEN, mockToken.address))
+            .to.changeTokenBalances(mockToken, [signer1, sendToHash], [150, -150])
+
+         expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(0)
+         expect(await mockToken.balanceOf(signer1Address)).to.be.equal(150)
+
+         await mockToken.connect(signer1).transfer(ownerAddress, 150)
+      }
    })
 
    it ('reverts revertPayment() when there is nothing to revert', async () => {

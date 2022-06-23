@@ -21,6 +21,7 @@ const ASSET_TYPE_COIN = 0
 const ASSET_TYPE_TOKEN = 1
 const ASSET_TYPE_NFT = 2
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+const NFT_ID_ARRAY = [... Array(10).keys()]
 
 const negateBigNumber = (num: BigNumber): BigNumber => {
       return BigNumber.from(`-${num.toString()}`)
@@ -35,6 +36,10 @@ describe('SendToHashMock contract', () => {
    let signer1Address: string;
    let signer2Address: string;
    let signer3Address: string;
+   let mockToken: MockToken
+   let mockToken2: MockToken
+   let mockNFT: MockNFT
+   let mockNFT2: MockNFT
    let sendToHashMock: SendToHashMock
    let idriss: IDriss
    let mockPriceOracle: MaticPriceAggregatorV3Mock
@@ -51,8 +56,12 @@ describe('SendToHashMock contract', () => {
       signer2Address = await signer2.getAddress()
       signer3Address = await signer3.getAddress()
 
+      mockToken = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
+      mockToken2 = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
+      mockNFT = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
+      mockNFT2 = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
       mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
-      idriss = (await waffle.deployContract(owner, IDrissArtifact, [signer2Address])) as IDriss
+      idriss = (await waffle.deployContract(owner, IDrissArtifact, [])) as IDriss
       sendToHashMock = (await waffle.deployContract(owner, SendToHashArtifact,
          [idriss.address, mockPriceOracle.address])) as SendToHashMock
 
@@ -60,6 +69,13 @@ describe('SendToHashMock contract', () => {
       idriss.addIDriss('b', signer2Address)
       idriss.addIDriss('c', signer3Address)
       idriss.addIDriss('0', ZERO_ADDRESS)
+
+      Promise.all(
+         NFT_ID_ARRAY.map( async (val, idx, _) => { 
+            await mockNFT.safeMint(ownerAddress, val).catch(e => {})
+            return mockNFT2.safeMint(ownerAddress, val).catch(e => {})
+         })
+      )
    })
 
    it ('properly calculates fee for a payment', async () => {
@@ -157,6 +173,350 @@ describe('SendToHashMock contract', () => {
 
       await expect(sendToHashMock.getAddressFromHash('nonexistent'))
          .to.be.revertedWith('IDriss not found.')
+   })
+
+   it ('properly handles internal mappings when invoking valid sendToAnyone() for coin', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      
+      const prices = [
+         dollarInWei.add(10000),
+         dollarInWei.add(230),
+         dollarInWei.add(50),
+         dollarInWei.add(17)
+      ]
+
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]})
+      await sendToHashMock.connect(signer2).sendToAnyone('b', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[1]})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.have.members([signer2Address])
+      expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.have.members([signer2Address])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(10000)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(10000)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_COIN, ZERO_ADDRESS, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_COIN, ZERO_ADDRESS, ownerAddress)).length)
+         .to.be.equal(0)
+
+      await sendToHashMock.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]})
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[3]})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.have.members([signer2Address, ownerAddress])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(ownerAddress, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(50)
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(10017)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(ownerAddress, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(10067)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_COIN, ZERO_ADDRESS, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_COIN, ZERO_ADDRESS, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(230)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('b', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(230)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_COIN, ZERO_ADDRESS, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_COIN, ZERO_ADDRESS, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(true)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer1Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(true)
+   })
+
+   it ('properly handles internal mappings when invoking valid sendToAnyone() for token', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockToken.transfer(signer2Address, 10000)
+      await mockToken.approve(sendToHashMock.address, 10000)
+      await mockToken.connect(signer2).approve(sendToHashMock.address, 10000)
+      
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 60, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('b', 110, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.have.members([signer2Address])
+      expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.have.members([signer2Address])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(60)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(60)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, ownerAddress)).length)
+         .to.be.equal(0)
+
+      await sendToHashMock.sendToAnyone('a', 75, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 90, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.have.members([signer2Address, ownerAddress])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(ownerAddress, 'a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(75)
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(150)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(ownerAddress, 'a', ASSET_TYPE_TOKEN, mockToken.address)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(225)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(110)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('b', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(110)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_TOKEN, mockToken.address, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_TOKEN, mockToken.address, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.be.equal(true)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer1Address, 'a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.be.equal(true)
+   })
+
+   it ('properly handles internal mappings when invoking valid sendToAnyone() for NFT', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockNFT.transferFrom(ownerAddress, signer2Address, 0)
+      await mockNFT.transferFrom(ownerAddress, signer2Address, 1)
+      await mockNFT.transferFrom(ownerAddress, signer2Address, 2)
+      await mockNFT.approve(sendToHashMock.address, 3)
+      await mockNFT.approve(sendToHashMock.address, 4)
+      await mockNFT.approve(sendToHashMock.address, 5)
+      await mockNFT.connect(signer2).approve(sendToHashMock.address, 0)
+      await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
+      await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
+      
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('b', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.members([signer2Address])
+      expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.members([signer2Address])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(1)
+      expect(await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.deep.members([BigNumber.from(0)])
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, signer2Address))
+         .to.have.deep.members([BigNumber.from(0)])
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, ownerAddress)).length)
+         .to.be.equal(0)
+
+      await sendToHashMock.sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.members([signer2Address, ownerAddress])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(ownerAddress, 'a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(2)
+      expect(await sendToHashMock.getPayerAssetMapAssetIds(ownerAddress, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.deep.members([BigNumber.from(3)])
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(3)
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, signer2Address))
+         .to.have.deep.members([BigNumber.from(0), BigNumber.from(2)])
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, ownerAddress))
+         .to.have.deep.members([BigNumber.from(3)])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'b', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.deep.members([BigNumber.from(1)])
+      expect(await sendToHashMock.getBeneficiaryMapAmount('b', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_NFT, mockNFT.address, signer2Address))
+         .to.have.deep.members([BigNumber.from(1)])
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_NFT, mockNFT.address, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(true)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer1Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(true)
+   })
+
+   it ('properly handles internal mappings when invoking valid revert() for coin', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      
+      const prices = [
+         dollarInWei.add(10000),
+         dollarInWei.add(230),
+         dollarInWei.add(50),
+         dollarInWei.add(17)
+      ]
+
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]})
+      await sendToHashMock.connect(signer2).sendToAnyone('b', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[1]})
+      await sendToHashMock.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]})
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[3]})
+
+      await sendToHashMock.connect(signer2).revertPayment('a', ASSET_TYPE_COIN, ZERO_ADDRESS)
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.have.members([ownerAddress])
+      expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.have.members([signer2Address])
+
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(true)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(true)
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(0)
+      expect(await sendToHashMock.getPayerAssetMapAmount(ownerAddress, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(50)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS)).length)
+         .to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(50)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_COIN, ZERO_ADDRESS, signer2Address)).length)
+         .to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_COIN, ZERO_ADDRESS, ownerAddress)).length)
+         .to.be.equal(0)
+
+      await sendToHashMock.connect(owner).revertPayment('a', ASSET_TYPE_COIN, ZERO_ADDRESS)
+
+      expect((await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).length)
+         .to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.have.members([signer2Address])
+
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'a', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(true)
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(230)
+      expect(await sendToHashMock.getPayerAssetMapAmount(ownerAddress, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.equal(0)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'b', ASSET_TYPE_COIN, ZERO_ADDRESS)).length)
+         .to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('b', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(230)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_COIN, ZERO_ADDRESS, signer2Address)).length)
+         .to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_COIN, ZERO_ADDRESS, ownerAddress)).length)
+         .to.be.equal(0)
+   })
+
+   it ('properly handles internal mappings when invoking valid revert() for token', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockToken.transfer(signer2Address, 10000)
+      await mockToken.approve(sendToHashMock.address, 10000)
+      await mockToken.connect(signer2).approve(sendToHashMock.address, 10000)
+      
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 60, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('b', 110, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.have.members([signer2Address])
+      expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.have.members([signer2Address])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(60)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(60)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, ownerAddress)).length)
+         .to.be.equal(0)
+
+      await sendToHashMock.sendToAnyone('a', 75, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 90, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.have.members([signer2Address, ownerAddress])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(ownerAddress, 'a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(75)
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(150)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(ownerAddress, 'a', ASSET_TYPE_TOKEN, mockToken.address)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(225)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_TOKEN, mockToken.address, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(110)
+      expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address)).length).to.be.equal(0)
+      expect(await sendToHashMock.getBeneficiaryMapAmount('b', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(110)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_TOKEN, mockToken.address, signer2Address)).length).to.be.equal(0)
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_TOKEN, mockToken.address, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.be.equal(true)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer1Address, 'a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'a', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.be.equal(true)
+   })
+
+   it ('properly handles internal mappings when invoking valid sendToAnyone() for NFT', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockNFT.transferFrom(ownerAddress, signer2Address, 0)
+      await mockNFT.transferFrom(ownerAddress, signer2Address, 1)
+      await mockNFT.transferFrom(ownerAddress, signer2Address, 2)
+      await mockNFT.approve(sendToHashMock.address, 3)
+      await mockNFT.approve(sendToHashMock.address, 4)
+      await mockNFT.approve(sendToHashMock.address, 5)
+      await mockNFT.connect(signer2).approve(sendToHashMock.address, 0)
+      await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
+      await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
+      
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('b', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.members([signer2Address])
+      expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.members([signer2Address])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(1)
+      expect(await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.deep.members([BigNumber.from(0)])
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, signer2Address))
+         .to.have.deep.members([BigNumber.from(0)])
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, ownerAddress)).length)
+         .to.be.equal(0)
+
+      await sendToHashMock.sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
+
+      expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.members([signer2Address, ownerAddress])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(ownerAddress, 'a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(2)
+      expect(await sendToHashMock.getPayerAssetMapAssetIds(ownerAddress, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.deep.members([BigNumber.from(3)])
+      expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(3)
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, signer2Address))
+         .to.have.deep.members([BigNumber.from(0), BigNumber.from(2)])
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('a', ASSET_TYPE_NFT, mockNFT.address, ownerAddress))
+         .to.have.deep.members([BigNumber.from(3)])
+
+      expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'b', ASSET_TYPE_NFT, mockNFT.address))
+         .to.have.deep.members([BigNumber.from(1)])
+      expect(await sendToHashMock.getBeneficiaryMapAmount('b', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
+      expect(await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_NFT, mockNFT.address, signer2Address))
+         .to.have.deep.members([BigNumber.from(1)])
+      expect((await sendToHashMock.getBeneficiaryMapAssetIds('b', ASSET_TYPE_NFT, mockNFT.address, ownerAddress)).length).to.be.equal(0)
+
+      expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(true)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer1Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(false)
+      expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.equal(true)
    })
 
    // it ('properly handles removal of assetIds from an array after claiming', async () => {
