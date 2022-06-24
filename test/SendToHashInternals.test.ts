@@ -141,10 +141,6 @@ describe('SendToHashMock contract', () => {
       expect(await sendToHashMock.safeHexStringToAddress(signer2Address)).to.be.equal(signer2Address)
       expect(await sendToHashMock.safeHexStringToAddress(signer3Address)).to.be.equal(signer3Address)
 
-      //TODO: check why it doesn't work
-      // await expect(sendToHashMock.safeHexStringToAddress(ZERO_ADDRESS))
-      //    .to.be.revertedWith('Address for the IDriss hash cannot resolve to 0x0')
-
       await expect(sendToHashMock.safeHexStringToAddress("0xaf5a"))
          .to.be.revertedWith('Address length is invalid')
 
