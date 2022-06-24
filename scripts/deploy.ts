@@ -10,15 +10,15 @@ async function main() {
 
   const SendToHash = await ethers.getContractFactory("SendToHash");
   const sendToHash = await SendToHash.deploy(
-    process.env.SEND_TO_HASH_CLAIM_EXPIRATION_IN_SECS!,
-    process.env.IRDISS_REGISTRY_CONTRACT_ADDRESS!
+    process.env.IRDISS_REGISTRY_CONTRACT_ADDRESS!,
+    process.env.MATIC_USD_PRICE_FEED_AGGREGATOR_CONTRACT_ADDRESS!
   );
 
-  console.log("SendToHash address:", sendToHash.address);
+  console.log("deployed SendToHash address:", sendToHash.address);
 
   //if you need to perform some action after deployment
   const deployedSendToHash = (await ethers.getContractAt("SendToHash", sendToHash.address, deployer)) as SendToHash;
-  // await deployedNft.transferOwnership(deployer.address)
+  // await deployedSendToHash.transferOwnership(deployer.address)
   //   .then(transaction => {
   //     return transaction.wait(1)
   //   }
@@ -30,7 +30,7 @@ async function main() {
   //     }
   //   })
 
-  console.log("done")
+  console.log("DONE")
 }
 
 main()

@@ -5,6 +5,9 @@ import 'dotenv/config'
 
 import { HardhatUserConfig, task } from 'hardhat/config'
 
+// syntactic sugar to add accounts element only if property exists
+const accounts = process.env.NETWORK_RPC_ENDPOINT_PRIVATE_KEY && {accounts: [process.env.NETWORK_RPC_ENDPOINT_PRIVATE_KEY]}
+
 task('accounts', 'print all accounts', async (args, hre) => {
   const accounts = await hre.ethers.getSigners();
 
@@ -31,13 +34,20 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 1337,
     },
-    rinkeby: {
-      url: "https://eth-rinkeby.alchemyapi.io/v2/123abc123abc123abc123abc123abcde",
-      // accounts: [privateKey1, privateKey2, ...]
-    },
     ganache: {
       chainId: 1337, //event though config says it's 5777
-      url: "http://127.0.0.1:7545",
+      url: process.env.NETWORK_RPC_ENDPOINT ?? "http://127.0.0.1:7545",
+      ...(accounts)
+    },
+    mumbai: {
+      chainId: 80001,
+      url: process.env.NETWORK_RPC_ENDPOINT ?? "https://matic-mumbai.chainstacklabs.com",
+      ...(accounts)
+    },
+    polygon_mainnet: {
+      chainId: 137,
+      url: process.env.NETWORK_RPC_ENDPOINT ?? "https://polygon-rpc.com",
+      ...(accounts)
     },
     hardhat_node: {
       chainId: 1337,
