@@ -152,6 +152,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         for (uint256 i = 0; i < payers.length; i++) {
             beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].pop();
+            delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress].assetIds[payers[i]];
             delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress];
             delete beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][payers[i]];
             if (_assetType == AssetType.NFT) {
