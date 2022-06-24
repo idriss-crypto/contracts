@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "hardhat/console.sol";
 
 import { ISendToHash } from "./interfaces/ISendToHash.sol";
 import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
@@ -102,11 +101,12 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
 
         // state is modified after external calls, to avoid reentrancy attacks
+        //TODO: check if this assumption is valid
         beneficiaryAsset.amount += _amount;
         payerAsset.amount += _amount;
         paymentFeesBalance += fee;
 
-        if (false == beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender]) {
+        if (beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender]) {
             beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
         }
