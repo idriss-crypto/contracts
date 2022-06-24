@@ -5,9 +5,9 @@
     "slither": "slither src/contracts/SendToHash.sol --solc-remaps @=node_modules/@ --hardhat-artifacts-directory src/artifacts",
     "mythril": "myth a src/contracts/SendToHash.sol --solc-json ./mythril.config.json",
     "test": "npx hardhat test",
-    "deploy-dev":  "NODE_ENV=development env-cmd -f .env.dev  npx hardhat run scripts/deploy.js --network ganache",
-    "deploy-test": "NODE_ENV=development env-cmd -f .env.test npx hardhat run scripts/deploy.js --network mumbai",
-    "deploy-prod": "NODE_ENV=production  env-cmd -f .env.prod npx hardhat run scripts/deploy.js --network polygon_mainnet"
+    "deploy-dev":  "NODE_ENV=development env-cmd -f .env.dev  npx hardhat run scripts/deploy.ts --network ganache",
+    "deploy-test": "NODE_ENV=development env-cmd -f .env.test npx hardhat run scripts/deploy.ts --network mumbai",
+    "deploy-prod": "NODE_ENV=production  env-cmd -f .env.prod npx hardhat run scripts/deploy.ts --network polygon_mainnet"
   },
   "author": "Rafal Kalinowski",
   "license": "MIT",
