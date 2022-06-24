@@ -15,11 +15,11 @@ import { ISendToHash } from "./interfaces/ISendToHash.sol";
 import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
 import { AssetLiability } from "./structs/IDrissStructs.sol";
 import { AssetType } from "./enums/IDrissEnums.sol";
+import { ConversionUtils } from "./libs/ConversionUtils.sol";
 
 
-//TODO: move utils functions to library
 /**
- * @title sendToHash
+ * @title SendToHash
  * @author Rafał Kalinowski
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
@@ -114,6 +114,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
     }
 
+//TODO: add documentation
     function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
         uint256 dollarPriceInWei = _dollarToWei();
         uint256 feeFromValue = (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
@@ -173,6 +174,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetClaimed(_IDrissHash, ownerIDrissAddr, adjustedAssetAddress, amountToClaim);
     }
 
+//TODO: add documentation
     function balanceOf (
         string memory _IDrissHash,
         AssetType _assetType,
@@ -226,6 +228,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert);
     }
 
+//TODO: add documentation
     function claimPaymentFees() onlyOwner external {
         uint256 amountToClaim = paymentFeesBalance;
         paymentFeesBalance = 0;
@@ -233,11 +236,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         _sendCoin(msg.sender, amountToClaim);
     }
 
+//TODO: add documentation
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
         require(sent, "Failed to withdraw");
     }
 
+//TODO: add documentation
     function _sendNFTAsset (
         uint256[] memory _assetIds,
         address _from,
@@ -252,6 +257,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
     }
 
+//TODO: add documentation
     function _sendTokenAsset (
         uint256 _amount,
         address _to,
@@ -263,6 +269,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         require(sent, "Failed to transfer token");
     }
 
+//TODO: add documentation
     function _sendTokenAssetFrom (
         uint256 _amount,
         address _from,
@@ -308,44 +315,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     {
         string memory IDrissString = IIDrissRegistry(IDRISS_ADDR).getIDriss(_IDrissHash);
         require(bytes(IDrissString).length > 0, "IDriss not found.");
-        IDrissAddress = _safeHexStringToAddress(IDrissString);
+        IDrissAddress = ConversionUtils.safeHexStringToAddress(IDrissString);
         _checkNonZeroAddress(IDrissAddress, "Address for the IDriss hash cannot resolve to 0x0");
-    }
-
-    /**
-    * @notice Change a single character from ASCII to 0-F hex value; revert on unparseable value
-    */
-    function _fromHexChar(uint8 c) internal pure returns (uint8) {
-        if (bytes1(c) >= bytes1('0') && bytes1(c) <= bytes1('9')) {
-            return c - uint8(bytes1('0'));
-        } else if (bytes1(c) >= bytes1('a') && bytes1(c) <= bytes1('f')) {
-            return 10 + c - uint8(bytes1('a'));
-        } else if (bytes1(c) >= bytes1('A') && bytes1(c) <= bytes1('F')) {
-            return 10 + c - uint8(bytes1('A'));
-        } else {
-            revert("Unparseable hex character found in address.");
-        }
-    }
-
-    /**
-    * @notice Get address from string. Revert if address is invalid.
-    */    
-    function _safeHexStringToAddress(string memory s) internal pure returns (address) {
-        bytes memory ss = bytes(s);
-        require(ss.length == 42, "Address length is invalid");
-        bytes memory _bytes = new bytes(ss.length / 2);
-        address resultAddress;
-
-        for (uint256 i = 1; i < ss.length / 2; i++) {
-            _bytes[i] = bytes1(_fromHexChar(uint8(ss[2*i])) * 16 +
-                        _fromHexChar(uint8(ss[2*i+1])));
-        }
-
-        assembly {
-            resultAddress := div(mload(add(add(_bytes, 0x20), 1)), 0x1000000000000000000000000)
-        }
-
-        return resultAddress;
     }
 
     /*

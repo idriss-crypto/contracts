@@ -6,6 +6,7 @@ import { SendToHash } from "../SendToHash.sol";
 import { IIDrissRegistry } from "../interfaces/IIDrissRegistry.sol";
 import { AssetLiability } from "../structs/IDrissStructs.sol";
 import { AssetType } from "../enums/IDrissEnums.sol";
+import { ConversionUtils } from "../libs/ConversionUtils.sol";
 
 /**
  * @title sendToHash
@@ -17,8 +18,7 @@ contract SendToHashMock is SendToHash {
     constructor(
         address _IDrissAddr,
         address _maticUsdAggregator
-    ) SendToHash(_IDrissAddr, _maticUsdAggregator)
-    { }
+    ) SendToHash(_IDrissAddr, _maticUsdAggregator) {}
 
 
     function splitPayment(uint256 _value) public view returns (uint256 fee, uint256 value) {
@@ -41,22 +41,16 @@ contract SendToHashMock is SendToHash {
     }
 
     function fromHexChar(uint8 c) external pure returns (uint8) {
-        return _fromHexChar(c);
+        return ConversionUtils.fromHexChar(c);
     }
 
     function safeHexStringToAddress(string memory s) external pure returns (address) {
-        return _safeHexStringToAddress(s);
+        return ConversionUtils.safeHexStringToAddress(s);
     }
 
     function dollarToWei() external view returns (uint256) {
         return _dollarToWei();
     }
-
-
-
-    // mapping(address => mapping(string => mapping(AssetType => mapping(address => AssetLiability)))) payerAssetMap;
-    // mapping(string => mapping(AssetType => mapping(address => AssetLiability))) beneficiaryAssetMap;
-    // mapping(string => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersMap;
 
     function getPayerAssetMapAmount(
         address _payerAddress,
