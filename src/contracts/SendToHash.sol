@@ -114,7 +114,12 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
     }
 
-//TODO: add documentation
+    /**
+     * @notice Calculates value of a fee from sent msg.value
+     * @param _value - payment value, taken from msg.value 
+     * @return fee - processing fee, minimum 1$, max 1%, but few percent of slippage are allowed for smaller values
+     * @return value - payment value after substracting fee
+     */
     function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
         uint256 dollarPriceInWei = _dollarToWei();
         uint256 feeFromValue = (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
@@ -174,7 +179,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetClaimed(_IDrissHash, ownerIDrissAddr, adjustedAssetAddress, amountToClaim);
     }
 
-//TODO: add documentation
+    /**
+     * @notice Get balance of given asset for IDrissHash
+     */
     function balanceOf (
         string memory _IDrissHash,
         AssetType _assetType,
@@ -228,7 +235,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert);
     }
 
-//TODO: add documentation
+    /**
+     * @notice Claim fees gathered from sendToAnyone(). Only owner can execute this function
+     */
     function claimPaymentFees() onlyOwner external {
         uint256 amountToClaim = paymentFeesBalance;
         paymentFeesBalance = 0;
@@ -236,13 +245,17 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         _sendCoin(msg.sender, amountToClaim);
     }
 
-//TODO: add documentation
+    /**
+     * @notice Wrapper for sending native Coin via call function
+     */
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
         require(sent, "Failed to withdraw");
     }
 
-//TODO: add documentation
+    /**
+     * @notice Wrapper for sending NFT asset with additional checks and iteraton over an array
+     */
     function _sendNFTAsset (
         uint256[] memory _assetIds,
         address _from,
@@ -257,7 +270,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
     }
 
-//TODO: add documentation
+    /**
+     * @notice Wrapper for sending ERC20 Token asset with additional checks
+     */
     function _sendTokenAsset (
         uint256 _amount,
         address _to,
@@ -269,7 +284,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         require(sent, "Failed to transfer token");
     }
 
-//TODO: add documentation
+    /**
+     * @notice Wrapper for sending ERC20 token from specific account with additional checks and iteraton over an array
+     */
     function _sendTokenAssetFrom (
         uint256 _amount,
         address _from,

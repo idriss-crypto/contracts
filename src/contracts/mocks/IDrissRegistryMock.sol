@@ -5,12 +5,23 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+/**
+ * @title MockToken
+ * @author Rafał Kalinowski
+ * @notice mock ERC20 token
+ * custom:experimental used only as a mock for tests
+ */
 contract MockToken is ERC20 {
     constructor() ERC20("MockToken", "MCKT"){
         _mint(msg.sender,1000*10**18);
     }
 }
-
+/**
+ * @title MockNFT
+ * @author Rafał Kalinowski
+ * @notice mock ERC721 token
+ * custom:experimental used only as a mock for tests
+ */
 contract MockNFT is ERC721, Ownable {
     constructor() ERC721("MockNFT", "MNFT"){ }
 
@@ -19,6 +30,12 @@ contract MockNFT is ERC721, Ownable {
     }
 }
 
+/**
+ * @title IDriss
+ * @author Rafał Kalinowski
+ * @notice mock IDrissRepository used for testing
+ * custom:experimental used only as a mock for tests
+ */
 contract IDriss {
     mapping(string => address) public IDrissOwnersMap;
     mapping(string => string) public IDrissMap;

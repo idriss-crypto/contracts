@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
+/**
+ * @title MaticPriceAggregatorV3Mock
+ * @author Rafał Kalinowski
+ * @notice mock MaticPriceAffregatorV3
+ * custom:experimental used only as a mock for tests
+ */
 contract MaticPriceAggregatorV3Mock {
    int256 price = 36662934;
   function decimals() public view returns (uint8) {

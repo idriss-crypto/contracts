@@ -9,9 +9,10 @@ import { AssetType } from "../enums/IDrissEnums.sol";
 import { ConversionUtils } from "../libs/ConversionUtils.sol";
 
 /**
- * @title sendToHash
+ * @title SendToHashMock
  * @author Rafał Kalinowski
- * @notice This contract is used to pay to the IDriss address without a need for it to be registered
+ * @notice mock SendToHash used to test internal functions
+ * custom:experimental used only as a mock for tests
  */
 contract SendToHashMock is SendToHash {
 
