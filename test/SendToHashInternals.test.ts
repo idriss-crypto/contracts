@@ -710,9 +710,6 @@ describe('SendToHashMock contract', () => {
       expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
          .to.be.equal(0)
       
-      for (let x of (await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))) {
-         console.log('x='+x)
-      }
       expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address)).length)
          .to.be.equal(0)
       expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(0)

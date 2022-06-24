@@ -627,7 +627,7 @@ describe('SendToHash contract', () => {
       await expect(() => sendToHash.revertPayment('a', ASSET_TYPE_NFT, mockNFT2.address))
          .to.changeTokenBalances(mockNFT2, [owner, sendToHash], [1, -1])
 
-      expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, mockNFT2.address)).to.be.equal(1) //signer1
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, mockNFT2.address)).to.be.equal(1)
       expect(await sendToHash.balanceOf('bcd', ASSET_TYPE_NFT, mockNFT2.address)).to.be.equal(0)
 
       await expect(() => sendToHash.sendToAnyone('bcd', 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei}))
