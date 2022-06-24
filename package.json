@@ -2,8 +2,12 @@
   "name": "idriss",
   "version": "1.0.0",
   "scripts": {
+    "slither": "slither src/contracts/SendToHash.sol --solc-remaps @=node_modules/@ --hardhat-artifacts-directory src/artifacts",
+    "mythril": "myth a src/contracts/SendToHash.sol --solc-json ./mythril.config.json",
     "test": "npx hardhat test",
-    "deploy-dev": "env-cmd -f .env.dev npx hardhat run scripts/deploy.js --network ganache"
+    "deploy-dev":  "NODE_ENV=development env-cmd -f .env.dev  npx hardhat run scripts/deploy.js --network ganache",
+    "deploy-test": "NODE_ENV=development env-cmd -f .env.test npx hardhat run scripts/deploy.js --network mumbai",
+    "deploy-prod": "NODE_ENV=production  env-cmd -f .env.prod npx hardhat run scripts/deploy.js --network polygon_mainnet"
   },
   "author": "Rafal Kalinowski",
   "license": "MIT",
@@ -27,6 +31,7 @@
   },
   "dependencies": {
     "@chainlink/contracts": "^0.4.1",
-    "@openzeppelin/contracts": "^4.6.0"
+    "@openzeppelin/contracts": "^4.6.0",
+    "env-cmd": "^10.1.0"
   }
 }
