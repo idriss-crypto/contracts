@@ -19,8 +19,8 @@ npx hardhat test
 
 ## Running code analysis tools
 ```
-npm slither
-npm mythril
+npm run slither
+npm run mythril
 ```
 
 ## Deployment
@@ -31,7 +31,7 @@ In order to automatically deploy smart contracts to EVM node you have to create 
 
 After creating proper config files, you can deploy the contract by using proper command for each environment:
 ```
-npm deploy-dev
-npm deploy-test
-npm deploy-prod
+npm run deploy-dev
+npm run deploy-test
+npm run deploy-prod
 ```
