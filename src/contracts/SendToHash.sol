@@ -196,6 +196,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
 
+        delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
         beneficiaryAsset.amount -= amountToRevert;
 
