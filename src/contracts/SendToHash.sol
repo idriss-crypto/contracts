@@ -325,6 +325,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             return _addr;
     }
 
+    /**
+    * @notice Helper function to retrieve address string from IDriss hash and transforming it into address type
+    */
     function _getAddressFromHash (string memory _IDrissHash)
         internal
         view
