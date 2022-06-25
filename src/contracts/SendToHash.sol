@@ -49,11 +49,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     event AssetTransferReverted(string indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
 
-    constructor(
-        address _IDrissAddr,
-        address _maticUsdAggregator
-    )
-    {
+    constructor( address _IDrissAddr, address _maticUsdAggregator) {
+        _checkNonZeroAddress(_IDrissAddr, "IDriss address cannot be 0");
+        _checkNonZeroAddress(_IDrissAddr, "Matic price feed address cannot be 0");
+
         IDRISS_ADDR = _IDrissAddr;
         MATIC_USD_PRICE_FEED = AggregatorV3Interface(_maticUsdAggregator);
     }
