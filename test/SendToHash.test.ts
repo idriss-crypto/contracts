@@ -77,6 +77,23 @@ describe('SendToHash contract', () => {
       )
    })
 
+   it('properly sets a contract owner', async () => {
+      expect(await sendToHash.owner()).to.be.equal(ownerAddress)
+   })
+
+   it('properly changes a contract owner', async () => {
+      await sendToHash.transferOwnership(signer1Address)
+
+      expect(await sendToHash.owner()).to.be.equal(signer1Address)
+      await expect(sendToHash.transferOwnership(ownerAddress))
+         .to.be.revertedWith('Ownable: caller is not the owner')
+   })
+
+   it('reverts when trying to renounce ownership', async () => {
+      await expect(sendToHash.renounceOwnership())
+         .to.be.revertedWith('Renouncing ownership is not supported')
+   })
+
    it('reverts sendToAnyone() when MATIC value is zero', async () => {
       await expect(sendToHash.sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0))
          .to.be.revertedWith('Value sent is smaller than minimal fee.')
