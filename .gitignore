@@ -2,3 +2,7 @@ cache
 node_modules
 **/.deps
 **/artifacts
+
+# .env files, only dev is allowed
+.env.*
+!.env.dev
