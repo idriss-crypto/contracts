@@ -17,6 +17,14 @@ Slither is a static code analyzer. Setup instructions can be found [HERE](https:
 npx hardhat test
 ```
 
+## Testing manually with Remix
+0. Setup remixd to connect Remix to a local filesystem or copy-paste the contracts mentioned below:
+1. Deploy ```src/contracts/mocks/MaticPriceAggregatorV3Mock.sol```
+1. Deploy ```src/contracts/mocks/IDrissRegistryMock.sol```
+3. Add new hash to address mappings by invoking ```IDrissRegistryMock.addIDriss()```
+1. Deploy ```src/contracts/mocks/SendToHashMock.sol``` providing adresses of contracts from step ***1*** and ***2***
+
+
 ## Running code analysis tools
 ```
 npm run slither
