@@ -361,6 +361,14 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         require(_value > 0, message);
     }
 
+    /*
+    * @notice Always reverts. By default Ownable supports renouncing ownership, that is setting owner to address 0.
+    *         However in this case it would disallow receiving payment fees by anyone.
+    */
+    function renounceOwnership() public override view onlyOwner {
+        revert("Renouncing ownership is not supported");
+    }
+
    function onERC721Received (
         address,
         address,
