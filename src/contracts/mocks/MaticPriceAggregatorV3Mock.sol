@@ -9,22 +9,22 @@ pragma solidity ^0.8.7;
  */
 contract MaticPriceAggregatorV3Mock {
    int256 price = 36662934;
-  function decimals() public view returns (uint8) {
+  function decimals() public pure returns (uint8) {
      return 8;
   }
 
-  function description() external view returns (string memory) {
+  function description() external pure returns (string memory) {
      return "MATIC -> USD Mock";
   }
 
-  function version() external view returns (uint256) {
+  function version() external pure returns (uint256) {
      return 3;
   }
 
   // getRoundData and latestRoundData should both raise "No data present"
   // if they do not have data to report, instead of returning unset values
   // which could be misinterpreted as actual reported values.
-  function getRoundData(uint80 _roundId)
+  function getRoundData(uint80)
     external
     view
     returns (
