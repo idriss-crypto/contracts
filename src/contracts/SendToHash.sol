@@ -86,28 +86,24 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             require(_isContract(_assetContractAddress), "Asset address is not a contract");
         }
 
+        if (!beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender]) {
+            beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
+            beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
+        }
 
-        if (_assetType == AssetType.Coin) {
-            _amount = paymentValue;
-        } else if (_assetType == AssetType.Token) {
+        if (_assetType == AssetType.Coin) { _amount = paymentValue; } 
+        beneficiaryAsset.amount += _amount;
+        payerAsset.amount += _amount;
+        paymentFeesBalance += fee;
+        
+        if (_assetType == AssetType.Token) {
             _sendTokenAssetFrom(_amount, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
             uint256 [] memory assetIds = new uint[](1);
             assetIds[0] = _assetId;
-            _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
             beneficiaryAsset.assetIds[msg.sender].push(_assetId);
             payerAsset.assetIds[msg.sender].push(_assetId);
-        }
-
-        // state is modified after external calls, to avoid reentrancy attacks
-        //TODO: check if this assumption is valid
-        beneficiaryAsset.amount += _amount;
-        payerAsset.amount += _amount;
-        paymentFeesBalance += fee;
-
-        if (!beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender]) {
-            beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].push(msg.sender);
-            beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
+            _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
         }
 
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
@@ -154,6 +150,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         _checkNonZeroValue(amountToClaim, "Nothing to claim.");
         require(ownerIDrissAddr == msg.sender, "Only owner can claim payments.");
+ 
+        beneficiaryAsset.amount = 0;
 
         for (uint256 i = 0; i < payers.length; i++) {
             beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].pop();
