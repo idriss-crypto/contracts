@@ -243,8 +243,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     }
 
     /**
-     * @notice Wrapper for sending native Coin via call function
-     */
+    * @notice Wrapper for sending native Coin via call function
+    * @dev When using this function please make sure to not send it to anyone, verify the
+    *      address in IDriss registry
+    */
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
         require(sent, "Failed to withdraw");
