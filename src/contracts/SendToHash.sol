@@ -112,7 +112,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     /**
      * @notice Calculates value of a fee from sent msg.value
      * @param _value - payment value, taken from msg.value 
-     * @return fee - processing fee, minimum 1$, max 1%, but few percent of slippage are allowed for smaller values
+     * @return fee - processing fee, minimum 1$, max 1%, but few percent of slippage is allowed for smaller values
      * @return value - payment value after substracting fee
      */
     function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
@@ -135,7 +135,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     }
 
     /**
-     * @notice This function allows a user to revert sending tokens to other IDriss and claim them back
+     * @notice Allows claiming assets by an IDriss owner
      */
     function claim (
         string memory _IDrissHash,
@@ -189,7 +189,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     }
 
     /**
-     * @notice This function allows a user to revert sending tokens to other IDriss and claim them back
+     * @notice Reverts sending tokens to an IDriss hash and claim them back
      */
     function revertPayment (
         string memory _IDrissHash,
@@ -352,10 +352,16 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         return(10**18 * maticPriceMultiplier) / uint256(maticPrice);
     }
 
+    /**
+    * @notice Helper function to check if address is non-zero. Reverts with passed message in that casee.
+    */
     function _checkNonZeroAddress (address _addr, string memory message) internal pure {
         require(_addr != address(0), message);
     }
 
+    /**
+    * @notice Helper function to check if value is bigger than 0. Reverts with passed message in that casee.
+    */
     function _checkNonZeroValue (uint256 _value, string memory message) internal pure {
         require(_value > 0, message);
     }
