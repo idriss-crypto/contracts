@@ -91,13 +91,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
         }
 
-        if (_assetType == AssetType.Coin) { _amount = paymentValue; } 
-        beneficiaryAsset.amount += _amount;
-        payerAsset.amount += _amount;
+        if (_assetType != AssetType.Coin) { paymentValue = _amount; } 
+        beneficiaryAsset.amount += paymentValue;
+        payerAsset.amount += paymentValue;
         paymentFeesBalance += fee;
         
         if (_assetType == AssetType.Token) {
-            _sendTokenAssetFrom(_amount, msg.sender, address(this), _assetContractAddress);
+            _sendTokenAssetFrom(paymentValue, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
             uint256 [] memory assetIds = new uint[](1);
             assetIds[0] = _assetId;
@@ -106,7 +106,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
         }
 
-        emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, _amount);
+        emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, paymentValue);
     }
 
     /**
