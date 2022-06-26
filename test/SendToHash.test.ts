@@ -7,6 +7,8 @@ import { MaticPriceAggregatorV3Mock } from '../src/types/MaticPriceAggregatorV3M
 import MaticPriceAggregatorV3MockArtifact from '../src/artifacts/src/contracts/mocks/MaticPriceAggregatorV3Mock.sol/MaticPriceAggregatorV3Mock.json'
 import { MockNFT } from '../src/types/MockNFT'
 import MockNFTArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockNFT.json'
+import { SendToHashReentrancyMock } from '../src/types/SendToHashReentrancyMock'
+import SendToHashReentrancyMockArtifact from '../src/artifacts/src/contracts/mocks/SendToHashReentrancyMock.sol/SendToHashReentrancyMock.json'
 import MockTokenArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockToken.json'
 import { MockToken } from '../src/types/MockToken'
 import { SendToHash } from '../src/types/SendToHash'
@@ -75,6 +77,36 @@ describe('SendToHash contract', () => {
             return mockNFT2.safeMint(ownerAddress, val).catch(e => {})
          })
       )
+   })
+
+   it('reverts when trying to perform an reentrancy on an NFT', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      let reentrancyContract = (await waffle.deployContract(owner, SendToHashReentrancyMockArtifact, [sendToHash.address])) as SendToHashReentrancyMock
+
+      await owner.sendTransaction({
+         to: reentrancyContract.address,
+         value: ethers.utils.parseEther('30.0')
+      })
+      
+      await expect(sendToHash.sendToAnyone('a', 5, ASSET_TYPE_NFT, reentrancyContract.address, 1, {value: dollarInWei}))
+         .to.be.revertedWith('ReentrancyGuard: reentrant call')
+
+      expect (await reentrancyContract.reentrancyCounter()).to.be.equal(0)
+   })
+
+   it('reverts when trying to perform an reentrancy on a token', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      let reentrancyContract = (await waffle.deployContract(owner, SendToHashReentrancyMockArtifact, [sendToHash.address])) as SendToHashReentrancyMock
+
+      await owner.sendTransaction({
+         to: reentrancyContract.address,
+         value: ethers.utils.parseEther('30.0')
+      })
+      
+      await expect(sendToHash.sendToAnyone('a', 5, ASSET_TYPE_TOKEN, reentrancyContract.address, 1, {value: dollarInWei}))
+         .to.be.revertedWith('ReentrancyGuard: reentrant call')
+
+      expect (await reentrancyContract.reentrancyCounter()).to.be.equal(0)
    })
 
    it('properly sets a contract owner', async () => {
