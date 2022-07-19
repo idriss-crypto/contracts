@@ -39,6 +39,7 @@ contract tipping {
     event TipMessage(
         address indexed recipientAddress,
         string message,
+        address sender,
         uint256 amount
     );
     event OwnershipTransferred(
@@ -51,7 +52,7 @@ contract tipping {
             value: msg.value.sub(msg.value.div(100))
         }("");
         require(success, "Failed to send.");
-        emit TipMessage(recipient_, message_, msg.value);
+        emit TipMessage(recipient_, message_, msg.sender, msg.value);
     }
 
     function sendTokenTo(
@@ -76,7 +77,7 @@ contract tipping {
             "Transfer failed"
         );
 
-        emit TipMessage(recipient_, message_, amount_);
+        emit TipMessage(recipient_, message_, msg.sender, amount_);
     }
 
     function withdraw() external OnlyAdminCanWithdraw {
