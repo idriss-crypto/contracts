@@ -40,26 +40,27 @@ contract tipping {
         address indexed recipientAddress,
         string message,
         address sender,
-        uint256 amount
+        uint256 val
     );
     event OwnershipTransferred(
         address indexed previousOwner,
         address indexed newOwner
     );
 
-    function sendTo(address recipient_, string memory message_) public payable {
+    function sendTo(address recipient_, string memory message_, uint256 val_) public payable {
         (bool success, ) = recipient_.call{
             value: msg.value.sub(msg.value.div(100))
         }("");
         require(success, "Failed to send.");
-        emit TipMessage(recipient_, message_, msg.sender, msg.value);
+        emit TipMessage(recipient_, message_, msg.sender, val_);
     }
 
     function sendTokenTo(
         address recipient_,
         uint256 amount_,
         address tokenContractAddr_,
-        string memory message_
+        string memory message_,
+        uint256 val_
     ) public payable {
         ERC20 paymentTc = ERC20(tokenContractAddr_);
         require(
@@ -77,7 +78,7 @@ contract tipping {
             "Transfer failed"
         );
 
-        emit TipMessage(recipient_, message_, msg.sender, amount_);
+        emit TipMessage(recipient_, message_, msg.sender, val_);
     }
 
     function withdraw() external OnlyAdminCanWithdraw {
