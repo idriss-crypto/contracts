@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.1;
+pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 error tipping__withdraw__OnlyAdminCanWithdraw();
 error tipping__withdrawToken__OnlyAdminCanWithdrawToken();
@@ -8,75 +9,59 @@ error tipping__addAdmin__OnlyContractOwnerCanAddAdmins();
 error tipping__deleteAdmin__OnlyContractOwnerCanDeleteAdmins();
 error tipping__transferContractOwnership__OnlyContractOwnerCanChangeOwnership();
 
-interface ERC20 {
-    function balanceOf(address _tokenOwner)
-        external
-        view
-        returns (uint balance);
 
-    function transfer(address _to, uint _tokens)
-        external
-        returns (bool success);
-
-    function allowance(address _contract, address _spender)
-        external
-        view
-        returns (uint256 remaining);
-
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _value
-    ) external returns (bool success);
-}
-
-contract tipping {
+contract Tipping {
     using SafeMath for uint256;
-    address public contractOwner = msg.sender;
+    address public contractOwner;
     mapping(address => uint256) public balanceOf;
     mapping(address => bool) public admins;
+
+    constructor () {
+        contractOwner = msg.sender;
+    }
 
     event TipMessage(
         address indexed recipientAddress,
         string message,
-        uint256 amount
+        address sender,
+        address tokenAddress
     );
     event OwnershipTransferred(
         address indexed previousOwner,
         address indexed newOwner
     );
 
-    function sendTo(address recipient_, string memory message_) public payable {
-        (bool success, ) = recipient_.call{
+    function sendTo(address _recipient, string memory _message) public payable {
+        (bool success, ) = _recipient.call{
             value: msg.value.sub(msg.value.div(100))
         }("");
         require(success, "Failed to send.");
-        emit TipMessage(recipient_, message_, msg.value);
+        emit TipMessage(_recipient, _message, msg.sender, address(0));
     }
 
     function sendTokenTo(
-        address recipient_,
-        uint256 amount_,
-        address tokenContractAddr_,
-        string memory message_
+        address _recipient,
+        uint256 _amount,
+        address _tokenContractAddr,
+        string memory _message
     ) public payable {
-        ERC20 paymentTc = ERC20(tokenContractAddr_);
+        IERC20 paymentTc = IERC20(_tokenContractAddr);
         require(
-            paymentTc.allowance(msg.sender, address(this)) >= amount_,
+            paymentTc.allowance(msg.sender, address(this)) >= _amount,
             "Insufficient Allowance"
         );
 
         require(
-            paymentTc.transferFrom(msg.sender, address(this), amount_),
+            paymentTc.transferFrom(msg.sender, address(this), _amount),
             "Transfer failed"
         );
 
         require(
-            paymentTc.transfer(recipient_, amount_.sub(amount_.div(100))),
+            paymentTc.transfer(_recipient, _amount.sub(_amount.div(100))),
             "Transfer failed"
         );
 
-        emit TipMessage(recipient_, message_, amount_);
+        emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr);
     }
 
     function withdraw() external OnlyAdminCanWithdraw {
@@ -91,11 +76,11 @@ contract tipping {
         _;
     }
 
-    function withdrawToken(address tokenContract)
+    function withdrawToken(address _tokenContract)
         external
         OnlyAdminCanWithdrawToken
     {
-        ERC20 withdrawTC = ERC20(tokenContract);
+        IERC20 withdrawTC = IERC20(_tokenContract);
         withdrawTC.transfer(msg.sender, withdrawTC.balanceOf(address(this)));
     }
 
@@ -106,11 +91,11 @@ contract tipping {
         _;
     }
 
-    function addAdmin(address adminAddress)
+    function addAdmin(address _adminAddress)
         external
         OnlyContractOwnerCanAddAdmins
     {
-        admins[adminAddress] = true;
+        admins[_adminAddress] = true;
     }
 
     modifier OnlyContractOwnerCanAddAdmins() {
@@ -120,11 +105,11 @@ contract tipping {
         _;
     }
 
-    function deleteAdmin(address adminAddress)
+    function deleteAdmin(address _adminAddress)
         external
         OnlyContractOwnerCanDeleteAdmins
     {
-        admins[adminAddress] = false;
+        admins[_adminAddress] = false;
     }
 
     modifier OnlyContractOwnerCanDeleteAdmins() {
@@ -135,16 +120,15 @@ contract tipping {
     }
 
     // Transfer contract ownership
-    function transferContractOwnership(address newOwner)
+    function transferContractOwnership(address _newOwner)
         public
-        payable
         OnlyContractOwnerCanChangeOwnership
     {
         require(
-            newOwner != address(0),
+            _newOwner != address(0),
             "Ownable: new contractOwner is the zero address."
         );
-        _transferOwnership(newOwner);
+        _transferOwnership(_newOwner);
     }
 
     modifier OnlyContractOwnerCanChangeOwnership() {
@@ -155,9 +139,9 @@ contract tipping {
     }
 
     // Helper function
-    function _transferOwnership(address newOwner) internal virtual {
+    function _transferOwnership(address _newOwner) internal virtual {
         address oldOwner = contractOwner;
-        contractOwner = newOwner;
-        emit OwnershipTransferred(oldOwner, newOwner);
+        contractOwner = _newOwner;
+        emit OwnershipTransferred(oldOwner, _newOwner);
     }
 }
