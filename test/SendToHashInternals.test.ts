@@ -89,7 +89,7 @@ describe('SendToHashMock contract', () => {
          dollarInWei.mul(100),
          dollarInWei.mul(1200),
       ]
-      
+
       const [fee, value] = await sendToHashMock.splitPayment(payments[0])
       const [fee1, value1] = await sendToHashMock.splitPayment(payments[1])
       const [fee2, value2] = await sendToHashMock.splitPayment(payments[2])
@@ -118,6 +118,40 @@ describe('SendToHashMock contract', () => {
 
       expect(fee6).to.be.equal(dollarInWei.mul(12))
       expect(value6).to.be.equal(dollarInWei.mul(1188))
+   })
+
+   it ('properly calculates fee after changing minimal fee', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      let currentFee = dollarInWei.mul(10)
+      const payments = [
+         dollarInWei.mul(10), //10$
+         dollarInWei.div(2).add(245000), //0.5$ + 245_000
+         dollarInWei.mul(36).div(2).add(100), //18$ + 100 wei
+         dollarInWei.mul(36).div(2).mul(95).div(100) //95% of 18$
+      ]
+
+      await sendToHashMock.changeMinimalPaymentFee(10, 1)
+      const [fee, value] = await sendToHashMock.splitPayment(payments[0])
+      expect(fee).to.be.equal(currentFee)
+      expect(value).to.be.equal(0)
+
+      currentFee = dollarInWei.div(2)
+      await sendToHashMock.changeMinimalPaymentFee(5, 10)
+      const [fee1, value1] = await sendToHashMock.splitPayment(payments[1])
+      expect(fee1).to.be.equal(currentFee)
+      expect(value1).to.be.equal(245000)
+
+      currentFee = dollarInWei.mul(18)
+      await sendToHashMock.changeMinimalPaymentFee(180, 10)
+      const [fee2, value2] = await sendToHashMock.splitPayment(payments[2])
+      expect(fee2).to.be.equal(currentFee)
+      expect(value2).to.be.equal(100)
+
+      currentFee = dollarInWei.mul(18)
+      await sendToHashMock.changeMinimalPaymentFee(3600, 200)
+      const [fee3, value3] = await sendToHashMock.splitPayment(payments[3])
+      expect(fee3).to.be.equal(currentFee.mul(95).div(100))
+      expect(value3).to.be.equal(0)
    })
 
    it ('properly translates characters to bytes', async () => {
@@ -173,7 +207,7 @@ describe('SendToHashMock contract', () => {
 
    it ('properly handles internal mappings when invoking valid sendToAnyone() for coin', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      
+
       const prices = [
          dollarInWei.add(10000),
          dollarInWei.add(230),
@@ -228,7 +262,7 @@ describe('SendToHashMock contract', () => {
       await mockToken.transfer(signer2Address, 10000)
       await mockToken.approve(sendToHashMock.address, 10000)
       await mockToken.connect(signer2).approve(sendToHashMock.address, 10000)
-      
+
       await sendToHashMock.connect(signer2).sendToAnyone('a', 60, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
       await sendToHashMock.connect(signer2).sendToAnyone('b', 110, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
 
@@ -282,7 +316,7 @@ describe('SendToHashMock contract', () => {
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 0)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
-      
+
       await sendToHashMock.connect(signer2).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
       await sendToHashMock.connect(signer2).sendToAnyone('b', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
 
@@ -335,7 +369,7 @@ describe('SendToHashMock contract', () => {
 
    it ('properly handles internal mappings when invoking valid revert() for coin', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      
+
       const prices = [
          dollarInWei.add(10000),
          dollarInWei.add(230),
@@ -426,7 +460,7 @@ describe('SendToHashMock contract', () => {
          .to.be.equal(false)
       expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address))
          .to.be.equal(true)
-      
+
       expect(await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_TOKEN, mockToken.address))
          .to.have.members([ownerAddress])
       expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_TOKEN, mockToken.address))
@@ -494,7 +528,7 @@ describe('SendToHashMock contract', () => {
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 0)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
-      
+
       await sendToHashMock.connect(signer2).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
       await sendToHashMock.connect(signer2).sendToAnyone('b', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
       await sendToHashMock.sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei})
@@ -528,7 +562,7 @@ describe('SendToHashMock contract', () => {
          .to.be.equal(true)
 
       await sendToHashMock.revertPayment('a', ASSET_TYPE_NFT, mockNFT.address)
-      
+
       expect((await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_NFT, mockNFT.address)).length)
          .to.be.equal(0)
       expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_NFT, mockNFT.address))
@@ -555,7 +589,7 @@ describe('SendToHashMock contract', () => {
 
    it ('properly handles internal mappings when invoking valid claim() for coin', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      
+
       const prices = [
          dollarInWei.add(10000),
          dollarInWei.add(230),
@@ -630,7 +664,7 @@ describe('SendToHashMock contract', () => {
          .to.be.equal(false)
       expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address))
          .to.be.equal(true)
-      
+
       expect((await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_TOKEN, mockToken.address)).length)
          .to.be.equal(0)
       expect(await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_TOKEN, mockToken.address))
@@ -650,7 +684,7 @@ describe('SendToHashMock contract', () => {
       expect(await sendToHashMock.getBeneficiaryMapAmount('b', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(110)
       expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address))
          .to.be.equal(110)
-         
+
       await sendToHashMock.connect(signer2).claim('b', ASSET_TYPE_TOKEN, mockToken.address)
 
       expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'b', ASSET_TYPE_TOKEN, mockToken.address))
@@ -689,7 +723,7 @@ describe('SendToHashMock contract', () => {
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 0)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
-      
+
       await sendToHashMock.connect(signer2).sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
       await sendToHashMock.connect(signer2).sendToAnyone('b', 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
       await sendToHashMock.sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei})
@@ -705,7 +739,7 @@ describe('SendToHashMock contract', () => {
          .to.have.members([signer2Address])
       expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address))
          .to.be.equal(0)
-      
+
       expect((await sendToHashMock.getPayerAssetMapAssetIds(signer2Address, 'a', ASSET_TYPE_NFT, mockNFT.address)).length)
          .to.be.equal(0)
       expect(await sendToHashMock.getBeneficiaryMapAmount('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(0)
@@ -724,7 +758,7 @@ describe('SendToHashMock contract', () => {
          .to.be.equal(true)
 
       await sendToHashMock.connect(signer2).claim('b', ASSET_TYPE_NFT, mockNFT.address)
-      
+
       expect((await sendToHashMock.getBeneficiaryPayersArray('a', ASSET_TYPE_NFT, mockNFT.address)).length)
          .to.be.equal(0)
       expect((await sendToHashMock.getBeneficiaryPayersArray('b', ASSET_TYPE_NFT, mockNFT.address)).length)

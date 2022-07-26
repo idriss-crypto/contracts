@@ -37,9 +37,11 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
     AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
     address public immutable IDRISS_ADDR;
-    uint256 public constant PAYMENT_FEE_PERCENTAGE = 10;
-    uint256 public constant PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
     uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
+    uint256 public PAYMENT_FEE_PERCENTAGE = 10;
+    uint256 public PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
+    uint256 public MINIMAL_PAYMENT_FEE = 1;
+    uint256 public MINIMAL_PAYMENT_FEE_DENOMINATOR = 1;
     uint256 public paymentFeesBalance;
 
     event AssetTransferred(string indexed toHash, address indexed from,
@@ -112,21 +114,22 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     /**
      * @notice Calculates value of a fee from sent msg.value
      * @param _value - payment value, taken from msg.value 
-     * @return fee - processing fee, minimum 1$, max 1%, but few percent of slippage is allowed for smaller values
+     * @return fee - processing fee, few percent of slippage is allowed
      * @return value - payment value after substracting fee
      */
     function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
         uint256 dollarPriceInWei = _dollarToWei();
+        uint256 minimalPaymentFee = (dollarPriceInWei * MINIMAL_PAYMENT_FEE) / MINIMAL_PAYMENT_FEE_DENOMINATOR;
         uint256 feeFromValue = (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
 
-        if (feeFromValue > dollarPriceInWei) {
+        if (feeFromValue > minimalPaymentFee) {
             fee = feeFromValue;
         // we accept slippage of matic price
-        } else if (_value >= dollarPriceInWei * (100 - PAYMENT_FEE_SLIPPAGE_PERCENT) / 100
-                        && _value <= dollarPriceInWei) {
+        } else if (_value >= minimalPaymentFee * (100 - PAYMENT_FEE_SLIPPAGE_PERCENT) / 100
+                        && _value <= minimalPaymentFee) {
             fee = _value;
         } else {
-            fee = dollarPriceInWei;
+            fee = minimalPaymentFee;
         }
 
         require (_value >= fee, "Value sent is smaller than minimal fee.");
@@ -364,6 +367,32 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     */
     function _checkNonZeroValue (uint256 _value, string memory message) internal pure {
         require(_value > 0, message);
+    }
+
+    /**
+    * @notice adjust payment fee percentage for big native currenct transfers
+    * @dev Solidity is not good when it comes to handling floats. We use denominator then, 
+    *      e.g. to set payment fee to 1.5% , just pass paymentFee = 15 & denominator = 1000 => 15 / 1000 = 0.015 = 1.5%
+    */
+    function changePaymentFeePercentage (uint256 _paymentFeePercentage, uint256 _paymentFeeDenominator) external onlyOwner {
+        _checkNonZeroValue(_paymentFeePercentage, "Payment fee has to be bigger than 0");
+        _checkNonZeroValue(_paymentFeeDenominator, "Payment fee denominator has to be bigger than 0");
+
+        PAYMENT_FEE_PERCENTAGE = _paymentFeePercentage;
+        PAYMENT_FEE_PERCENTAGE_DENOMINATOR = _paymentFeeDenominator;
+    }
+
+    /**
+    * @notice adjust minimal payment fee for all asset transfers
+    * @dev Solidity is not good when it comes to handling floats. We use denominator then, 
+    *      e.g. to set minimal payment fee to 2.2$ , just pass paymentFee = 22 & denominator = 10 => 22 / 10 = 2.2
+    */
+    function changeMinimalPaymentFee (uint256 _minimalPaymentFee, uint256 _paymentFeeDenominator) external onlyOwner {
+        _checkNonZeroValue(_minimalPaymentFee, "Payment fee has to be bigger than 0");
+        _checkNonZeroValue(_paymentFeeDenominator, "Payment fee denominator has to be bigger than 0");
+
+        MINIMAL_PAYMENT_FEE = _minimalPaymentFee;
+        MINIMAL_PAYMENT_FEE_DENOMINATOR = _paymentFeeDenominator;
     }
 
     /*

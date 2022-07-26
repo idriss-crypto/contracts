@@ -931,6 +931,65 @@ describe('SendToHash contract', () => {
       expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
    })
 
+   it ('sets minimal fee properly', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei() //1$
+      const newMinimalFee = dollarInWei.mul(43).div(10)
+      const payment = newMinimalFee.add(2345000)
+
+      await sendToHash.changeMinimalPaymentFee(43, 10) //4.3$
+
+      await mockNFT.approve(sendToHash.address, 2)
+      await mockToken.approve(sendToHash.address, 50)
+      await sendToHash.sendToAnyone('a', 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: newMinimalFee.mul(95).div(100)})
+      await sendToHash.connect(signer3).sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: payment})
+
+      await expect(sendToHash.sendToAnyone('a', 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: newMinimalFee.div(2)}))
+         .to.be.revertedWith('Value sent is smaller than minimal fee.')
+
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(2345000)
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(5)
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(0)
+   })
+
+   it ('sets percentage fee properly', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei() //1$
+      const payment = dollarInWei.mul(200)
+      const paymentFee = payment.mul(25).div(1000)
+
+      await sendToHash.changePaymentFeePercentage(25, 1000) //2.5%
+
+      await mockNFT.approve(sendToHash.address, 2)
+      await mockToken.approve(sendToHash.address, 50)
+      await sendToHash.sendToAnyone('a', 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei.mul(95).div(100)})
+      await sendToHash.connect(signer3).sendToAnyone('a', 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: payment})
+
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(payment.sub(paymentFee))
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(5)
+      expect(await sendToHash.balanceOf('a', ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(0)
+   })
+
+   it ('reverts when trying to set 0 fee', async () => {
+      await expect(sendToHash.changeMinimalPaymentFee(0, 1))
+          .to.be.revertedWith('Payment fee has to be bigger than 0')
+      await expect(sendToHash.changeMinimalPaymentFee(2, 0))
+          .to.be.revertedWith('Payment fee denominator has to be bigger than 0')
+      await expect(sendToHash.changePaymentFeePercentage(0, 1))
+          .to.be.revertedWith('Payment fee has to be bigger than 0')
+      await expect(sendToHash.changePaymentFeePercentage(2, 0))
+          .to.be.revertedWith('Payment fee denominator has to be bigger than 0')
+   })
+
+   it ('reverts when non-owner tries to set payment fee', async () => {
+      await expect(sendToHash.connect(signer1).changeMinimalPaymentFee(0, 1))
+          .to.be.revertedWith('Ownable: caller is not the owner')
+      await expect(sendToHash.connect(signer1).changeMinimalPaymentFee(2, 0))
+          .to.be.revertedWith('Ownable: caller is not the owner')
+      await expect(sendToHash.connect(signer1).changePaymentFeePercentage(0, 1))
+          .to.be.revertedWith('Ownable: caller is not the owner')
+      await expect(sendToHash.connect(signer1).changePaymentFeePercentage(2, 0))
+          .to.be.revertedWith('Ownable: caller is not the owner')
+   })
+
    it ('reverts claim() when trying go claim payment for second time', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
