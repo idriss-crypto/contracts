@@ -24,6 +24,14 @@ interface ISendToHash {
         address _assetContractAddress
     ) external;
 
+    function moveAssetToOtherHash (
+        string memory _FromIDrissHash,
+        string memory _ToIDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress,
+        uint256 _assetId
+    ) external;
+
     function balanceOf (
         string memory _IDrissHash,
         AssetType _assetType,
