@@ -812,6 +812,57 @@ describe('SendToHash contract', () => {
       }
    })
 
+   it ('reverts moveAssetToOtherHash() when there is nothing to revert', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_COIN, ZERO_ADDRESS, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_NFT, mockNFT.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+   })
+
+   it ('properly handles moving assets multiple times in moveAssetToOtherHash()', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      assert(false)
+   })
+
+   it ('reverts when old IDriss hash owner tries to get funds after moveAssetToOtherHash()', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      assert(false)
+   })
+
+   it ('allows user to claim assets from new hash after moveAssetToOtherHash()', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      assert(false)
+   })
+
+   it ('performs moveAssetToOtherHash() for native currency', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      assert(false)
+   })
+
+   it ('performs moveAssetToOtherHash() for native currency', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      assert(false)
+   })
+
+   it ('performs moveAssetToOtherHash() for native currency', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      assert(false)
+   })
+
+   it ('performs moveAssetToOtherHash() for native currency', async () => {
+      await expect(sendToHash.connect(signer1).moveAssetToOtherHash('a', 'b', ASSET_TYPE_TOKEN, mockToken.address, 0))
+          .to.be.revertedWith('Nothing to revert.')
+      assert(false)
+   })
+
    it ('reverts revertPayment() when there is nothing to revert', async () => {
       await expect(sendToHash.connect(signer1).revertPayment('a', ASSET_TYPE_COIN, ZERO_ADDRESS))
          .to.be.revertedWith('Nothing to revert.')
