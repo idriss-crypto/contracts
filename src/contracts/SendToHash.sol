@@ -122,7 +122,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
         }
 
-        if (_assetType != AssetType.Coin) { _amount = _amount; }
+        if (_assetType == AssetType.NFT) { _amount = 1; }
         beneficiaryAsset.amount += _amount;
         payerAsset.amount += _amount;
         paymentFeesBalance += _fee;
@@ -279,15 +279,21 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         string memory _FromIDrissHash,
         string memory _ToIDrissHash,
         AssetType _assetType,
-        address _assetContractAddress,
-        uint256 _assetId
+        address _assetContractAddress
     ) external override nonReentrant() {
-        uint256 _amount = setStateForRevertPayment(_FromIDrissHash, _assetType, _assetContractAddress);
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
+        uint256[] memory assetIds = beneficiaryAssetMap[_FromIDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
+        uint256 _amount = setStateForRevertPayment(_FromIDrissHash, _assetType, _assetContractAddress);
 
         _checkNonZeroValue(_amount, "Nothing to transfer");
 
-        setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, _assetId);
+        if (_assetType == AssetType.NFT) {
+            for (uint256 i = 0; i < assetIds.length; i++) {
+                setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, assetIds[i]);
+            }
+        } else {
+            setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, 0);
+        }
 
         emit AssetMoved(_FromIDrissHash, _ToIDrissHash, msg.sender, adjustedAssetAddress);
     }

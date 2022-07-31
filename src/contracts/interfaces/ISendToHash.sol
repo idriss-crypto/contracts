@@ -28,8 +28,7 @@ interface ISendToHash {
         string memory _FromIDrissHash,
         string memory _ToIDrissHash,
         AssetType _assetType,
-        address _assetContractAddress,
-        uint256 _assetId
+        address _assetContractAddress
     ) external;
 
     function balanceOf (
