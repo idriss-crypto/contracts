@@ -163,7 +163,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      * @notice Allows claiming assets by an IDriss owner
      */
     function claim (
-        string memory  _IDrissHash,
+        string memory _IDrissHash,
         string memory _claimPassword,
         AssetType _assetType,
         address _assetContractAddress
