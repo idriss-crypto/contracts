@@ -160,7 +160,7 @@ describe('SendToHashMock contract', async () => {
       }
 
       for(let i = 0; i < 6; i++) {
-         expect(await sendToHashMock.fromHexChar(signer1Hash.charCodeAt(0) + i)).to.be.equal(10 + i)
+         expect(await sendToHashMock.fromHexChar('a'.charCodeAt(0) + i)).to.be.equal(10 + i)
          expect(await sendToHashMock.fromHexChar('A'.charCodeAt(0) + i)).to.be.equal(10 + i)
       }
 
