@@ -14,6 +14,7 @@ interface ISendToHash {
 
     function claim (
         string memory _IDrissHash,
+        string memory _claimPassword,
         AssetType _assetType,
         address _assetContractAddress
     ) external;

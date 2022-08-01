@@ -164,6 +164,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      */
     function claim (
         string memory _IDrissHash,
+        string memory _claimPassword,
         AssetType _assetType,
         address _assetContractAddress
     ) external override nonReentrant() {

@@ -33,9 +33,12 @@ describe('SendToHashMock contract', async () => {
    let signer1Address: string;
    let signer2Address: string;
    let signer3Address: string;
-   let signer1Hash = await hashIDrissWithPass('a', 'pass-a');
-   let signer2Hash = await hashIDrissWithPass('b', 'pass-b');
-   let signer3Hash = await hashIDrissWithPass('c', 'pass-c');
+   let signer1ClaimPassword = 'pass-a';
+   let signer2ClaimPassword = 'pass-b';
+   let signer3ClaimPassword = 'pass-c';
+   let signer1Hash = await hashIDrissWithPass('a',signer1ClaimPassword);
+   let signer2Hash = await hashIDrissWithPass('b', signer2ClaimPassword);
+   let signer3Hash = await hashIDrissWithPass('c', signer3ClaimPassword);
    let mockToken: MockToken
    let mockToken2: MockToken
    let mockNFT: MockNFT
@@ -602,7 +605,7 @@ describe('SendToHashMock contract', async () => {
       await sendToHashMock.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]})
       await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[3]})
 
-      await sendToHashMock.connect(signer1).claim(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)
+      await sendToHashMock.connect(signer1).claim(signer1Hash, signer1ClaimPassword, ASSET_TYPE_COIN, ZERO_ADDRESS)
 
       expect((await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)).length)
          .to.be.equal(0)
@@ -654,7 +657,7 @@ describe('SendToHashMock contract', async () => {
       await sendToHashMock.sendToAnyone(signer1Hash, 75, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
       await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 90, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
 
-      await sendToHashMock.connect(signer1).claim(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)
+      await sendToHashMock.connect(signer1).claim(signer1Hash, signer1ClaimPassword, ASSET_TYPE_TOKEN, mockToken.address)
 
       expect(await sendToHashMock.getBeneficiaryPayersMap(ownerAddress, signer1Hash, ASSET_TYPE_TOKEN, mockToken.address))
          .to.be.equal(false)
@@ -685,7 +688,7 @@ describe('SendToHashMock contract', async () => {
       expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, signer2Hash, ASSET_TYPE_TOKEN, mockToken.address))
          .to.be.equal(110)
 
-      await sendToHashMock.connect(signer2).claim(signer2Hash, ASSET_TYPE_TOKEN, mockToken.address)
+      await sendToHashMock.connect(signer2).claim(signer2Hash, signer2ClaimPassword, ASSET_TYPE_TOKEN, mockToken.address)
 
       expect(await sendToHashMock.getPayerAssetMapAmount(signer2Address, signer2Hash, ASSET_TYPE_TOKEN, mockToken.address))
          .to.be.equal(0)
@@ -731,7 +734,7 @@ describe('SendToHashMock contract', async () => {
       await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 5, {value: dollarInWei})
       await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
 
-      await sendToHashMock.connect(signer1).claim(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)
+      await sendToHashMock.connect(signer1).claim(signer1Hash, signer1ClaimPassword, ASSET_TYPE_NFT, mockNFT.address)
 
       expect((await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).length)
          .to.be.equal(0)
@@ -757,7 +760,7 @@ describe('SendToHashMock contract', async () => {
       expect(await sendToHashMock.getBeneficiaryPayersMap(signer2Address, signer2Hash, ASSET_TYPE_NFT, mockNFT.address))
          .to.be.equal(true)
 
-      await sendToHashMock.connect(signer2).claim(signer2Hash, ASSET_TYPE_NFT, mockNFT.address)
+      await sendToHashMock.connect(signer2).claim(signer2Hash, signer2ClaimPassword, ASSET_TYPE_NFT, mockNFT.address)
 
       expect((await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).length)
          .to.be.equal(0)
