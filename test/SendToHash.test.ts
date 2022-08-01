@@ -11,7 +11,7 @@ import SendToHashArtifact from '../src/artifacts/src/contracts/SendToHash.sol/Se
 import chaiAsPromised from 'chai-as-promised'
 import { MockProvider, solidity } from 'ethereum-waffle'
 
-import { hashIDriss, negateBigNumber } from './TestUtils'
+import { hashIDriss, hashIDrissWithPass, negateBigNumber } from './TestUtils'
 
 chai.use(solidity) // solidiity matchers, e.g. expect().to.be.revertedWith("message")
 chai.use(chaiAsPromised) //eventually
@@ -31,9 +31,9 @@ describe('SendToHash contract', async () => {
    let signer1Address: string;
    let signer2Address: string;
    let signer3Address: string;
-   let signer1Hash = await hashIDriss('a', 'pass-a');
-   let signer2Hash = await hashIDriss('b', 'pass-b');
-   let signer3Hash = await hashIDriss('c', 'pass-c');
+   let signer1Hash = await hashIDrissWithPass('a', 'pass-a');
+   let signer2Hash = await hashIDrissWithPass('b', 'pass-b');
+   let signer3Hash = await hashIDrissWithPass('c', 'pass-c');
    let sendToHash: SendToHash
    let idriss: IDriss
    let mockToken: MockToken
