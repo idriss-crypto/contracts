@@ -27,13 +27,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     using SafeCast for int256;
 
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
-    mapping(address => mapping(string => mapping(AssetType => mapping(address => AssetLiability)))) payerAssetMap;
+    mapping(address => mapping(bytes32 => mapping(AssetType => mapping(address => AssetLiability)))) payerAssetMap;
     // beneficiaryHash => assetType => assetAddress => AssetLiability
-    mapping(string => mapping(AssetType => mapping(address => AssetLiability))) beneficiaryAssetMap;
+    mapping(bytes32 => mapping(AssetType => mapping(address => AssetLiability))) beneficiaryAssetMap;
     // beneficiaryHash => assetType => assetAddress => payer[]
-    mapping(string => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersArray;
+    mapping(bytes32 => mapping(AssetType => mapping(address => address[]))) beneficiaryPayersArray;
     // beneficiaryHash => assetType => assetAddress => payer => didPay
-    mapping(string => mapping(AssetType => mapping(address => mapping(address => bool)))) beneficiaryPayersMap;
+    mapping(bytes32 => mapping(AssetType => mapping(address => mapping(address => bool)))) beneficiaryPayersMap;
 
     AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
     address public immutable IDRISS_ADDR;
@@ -44,13 +44,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     uint256 public MINIMAL_PAYMENT_FEE_DENOMINATOR = 1;
     uint256 public paymentFeesBalance;
 
-    event AssetTransferred(string indexed toHash, address indexed from,
+    event AssetTransferred(bytes32 indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
-    event AssetMoved(string indexed fromHash, string indexed toHash,
+    event AssetMoved(bytes32 indexed fromHash, bytes32 indexed toHash,
         address indexed from, address assetContractAddress);
-    event AssetClaimed(string indexed toHash, address indexed beneficiary,
+    event AssetClaimed(bytes32 indexed toHash, address indexed beneficiary,
         address indexed assetContractAddress, uint256 amount);
-    event AssetTransferReverted(string indexed toHash, address indexed from,
+    event AssetTransferReverted(bytes32 indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount);
 
     constructor( address _IDrissAddr, address _maticUsdAggregator) {
@@ -69,7 +69,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      *      `increaseAllowance` in OpenZeppelin to mitigate risk of race condition and double spend.
      */
     function sendToAnyone (
-        string memory _IDrissHash,
+        bytes32 _IDrissHash,
         uint256 _amount,
         AssetType _assetType,
         address _assetContractAddress,
@@ -96,7 +96,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      * @notice Sets state for sendToAnyone function invocation
      */
     function setStateForSendToAnyone (
-        string memory _IDrissHash,
+        bytes32 _IDrissHash,
         uint256 _amount,
         uint256 _fee,
         AssetType _assetType,
@@ -163,15 +163,17 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      * @notice Allows claiming assets by an IDriss owner
      */
     function claim (
-        string memory _IDrissHash,
+        string memory  _IDrissHash,
         string memory _claimPassword,
         AssetType _assetType,
         address _assetContractAddress
     ) external override nonReentrant() {
         address ownerIDrissAddr = _getAddressFromHash(_IDrissHash);
+        bytes32 hashWithPassword = hashIDrissWithPassword(_IDrissHash, _claimPassword);
+
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
-        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
-        address [] memory payers = beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress];
+        AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[hashWithPassword][_assetType][adjustedAssetAddress];
+        address [] memory payers = beneficiaryPayersArray[hashWithPassword][_assetType][adjustedAssetAddress];
         uint256 amountToClaim = beneficiaryAsset.amount;
 
         _checkNonZeroValue(amountToClaim, "Nothing to claim.");
@@ -180,10 +182,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         beneficiaryAsset.amount = 0;
 
         for (uint256 i = 0; i < payers.length; i++) {
-            beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress].pop();
-            delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress].assetIds[payers[i]];
-            delete payerAssetMap[payers[i]][_IDrissHash][_assetType][adjustedAssetAddress];
-            delete beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][payers[i]];
+            beneficiaryPayersArray[hashWithPassword][_assetType][adjustedAssetAddress].pop();
+            delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress].assetIds[payers[i]];
+            delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress];
+            delete beneficiaryPayersMap[hashWithPassword][_assetType][adjustedAssetAddress][payers[i]];
             if (_assetType == AssetType.NFT) {
                 uint256[] memory assetIds = beneficiaryAsset.assetIds[payers[i]];
                 delete beneficiaryAsset.assetIds[payers[i]];
@@ -191,7 +193,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             }
         }
 
-        delete beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        delete beneficiaryAssetMap[hashWithPassword][_assetType][adjustedAssetAddress];
 
         if (_assetType == AssetType.Coin) {
             _sendCoin(ownerIDrissAddr, amountToClaim);
@@ -199,14 +201,14 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             _sendTokenAsset(amountToClaim, ownerIDrissAddr, _assetContractAddress);
         }
 
-        emit AssetClaimed(_IDrissHash, ownerIDrissAddr, adjustedAssetAddress, amountToClaim);
+        emit AssetClaimed(hashWithPassword, ownerIDrissAddr, adjustedAssetAddress, amountToClaim);
     }
 
     /**
      * @notice Get balance of given asset for IDrissHash
      */
     function balanceOf (
-        string memory _IDrissHash,
+        bytes32 _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
     ) external override view returns (uint256) {
@@ -218,7 +220,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      * @notice Reverts sending tokens to an IDriss hash and claim them back
      */
     function revertPayment (
-        string memory _IDrissHash,
+        bytes32 _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
     ) external override nonReentrant() {
@@ -241,7 +243,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      * @notice Sets the state for reverting the payment for a user
      */
     function setStateForRevertPayment (
-        string memory _IDrissHash,
+        bytes32 _IDrissHash,
         AssetType _assetType,
         address _assetContractAddress
     ) internal returns(uint256 amountToRevert) {
@@ -277,8 +279,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      * @notice This function allows a user to move tokens or coins they already sent to other IDriss
      */
     function moveAssetToOtherHash (
-        string memory _FromIDrissHash,
-        string memory _ToIDrissHash,
+        bytes32 _FromIDrissHash,
+        bytes32 _ToIDrissHash,
         AssetType _assetType,
         address _assetContractAddress
     ) external override nonReentrant() {
@@ -457,6 +459,17 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         MINIMAL_PAYMENT_FEE = _minimalPaymentFee;
         MINIMAL_PAYMENT_FEE_DENOMINATOR = _paymentFeeDenominator;
+    }
+
+    /**
+    * @notice Get bytes32 hash of IDriss and password. It's used to obfuscate real IDriss that received a payment until the owner claims it.
+    *         Because it's a pure function, it won't be visible in mempool, and it's safe to execute.
+    */
+    function hashIDrissWithPassword (
+        string memory  _IDrissHash,
+        string memory _claimPassword
+    ) public pure override returns (bytes32) {
+        return keccak256(abi.encodePacked(_IDrissHash, _claimPassword));
     }
 
     /*

@@ -34,9 +34,9 @@ describe('SendToHash contract', async () => {
    let signer1ClaimPassword = 'pass-a';
    let signer2ClaimPassword = 'pass-b';
    let signer3ClaimPassword = 'pass-c';
-   let signer1Hash = await hashIDrissWithPass('a',signer1ClaimPassword);
-   let signer2Hash = await hashIDrissWithPass('b', signer2ClaimPassword);
-   let signer3Hash = await hashIDrissWithPass('c', signer3ClaimPassword);
+   let signer1Hash: string;
+   let signer2Hash: string;
+   let signer3Hash: string;
    let sendToHash: SendToHash
    let idriss: IDriss
    let mockToken: MockToken
@@ -66,6 +66,10 @@ describe('SendToHash contract', async () => {
       sendToHash = (await waffle.deployContract(owner, SendToHashArtifact,
          [idriss.address, mockPriceOracle.address])) as SendToHash
 
+      signer1Hash = await sendToHash.hashIDrissWithPassword('a', signer1ClaimPassword);  
+      signer2Hash = await sendToHash.hashIDrissWithPassword('b', signer2ClaimPassword); 
+      signer3Hash = await sendToHash.hashIDrissWithPassword('c', signer3ClaimPassword); 
+
       idriss.addIDriss(signer1Hash, signer1Address)
       idriss.addIDriss(signer2Hash, signer2Address)
       idriss.addIDriss(signer3Hash, signer3Address)
@@ -80,12 +84,12 @@ describe('SendToHash contract', async () => {
 
    it('reverts when trying to perform an reentrancy on an NFT', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      let reentrancyContract = (await waffle.deployContract(owner, SendToHashReentrancyMockArtifact, [sendToHash.address])) as SendToHashReentrancyMock
+      let reentrancyContract = (await waffle.deployContract(owner, SendToHashReentrancyMockArtifact, [sendToHash.address, signer1Hash])) as SendToHashReentrancyMock
 
       await owner.sendTransaction({
          to: reentrancyContract.address,
          value: ethers.utils.parseEther('30.0')
-      })
+      });
       
       await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_NFT, reentrancyContract.address, 1, {value: dollarInWei}))
          .to.be.revertedWith('ReentrancyGuard: reentrant call')
@@ -95,7 +99,7 @@ describe('SendToHash contract', async () => {
 
    it('reverts when trying to perform an reentrancy on a token', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
-      let reentrancyContract = (await waffle.deployContract(owner, SendToHashReentrancyMockArtifact, [sendToHash.address])) as SendToHashReentrancyMock
+      let reentrancyContract = (await waffle.deployContract(owner, SendToHashReentrancyMockArtifact, [sendToHash.address, signer1Hash])) as SendToHashReentrancyMock
 
       await owner.sendTransaction({
          to: reentrancyContract.address,
@@ -1000,6 +1004,23 @@ describe('SendToHash contract', async () => {
 
       expect(await mockToken.balanceOf(signer1Address)).to.be.equal(50)
       expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(0)
+   })
+
+   it ('reverts claim() when passing wrong password', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockToken.approve(sendToHash.address, 50)
+      await mockNFT.approve(sendToHash.address, 1)
+
+      await sendToHash.sendToAnyone(signer3Hash, 50, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, {value: dollarInWei.add(1500)})
+      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer2Hash, 50, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+
+      await expect(sendToHash.connect(signer1).claim(signer1Hash, 'wrongpass', ASSET_TYPE_COIN, ZERO_ADDRESS))
+         .to.be.revertedWith('Nothing to claim.')
+      await expect(sendToHash.connect(signer1).claim(signer1Hash, 'asdfglkh', ASSET_TYPE_NFT, mockNFT.address))
+         .to.be.revertedWith('Nothing to claim.')
+      await expect(sendToHash.connect(signer1).claim(signer1Hash, 'sdflhdsf', ASSET_TYPE_TOKEN, mockToken.address))
+         .to.be.revertedWith('Nothing to claim.')
    })
 
    it ('reverts claim() when there is nothing to claim', async () => {

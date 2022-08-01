@@ -10,7 +10,9 @@ import MockNFTArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistry
 import MockTokenArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockToken.json'
 import { MockToken } from '../src/types/MockToken'
 import { SendToHashMock } from '../src/types/SendToHashMock'
+import { SendToHashUtilsMock } from '../src/types/SendToHashUtilsMock'
 import SendToHashArtifact from '../src/artifacts/src/contracts/mocks/SendToHashMock.sol/SendToHashMock.json'
+import SendToHashUtilsArtifact from '../src/artifacts/src/contracts/mocks/SendToHashUtilsMock.sol/SendToHashUtilsMock.json'
 import chaiAsPromised from 'chai-as-promised'
 import { MockProvider, solidity } from 'ethereum-waffle'
 import { hashIDriss, hashIDrissWithPass } from './TestUtils'
@@ -36,20 +38,21 @@ describe('SendToHashMock contract', async () => {
    let signer1ClaimPassword = 'pass-a';
    let signer2ClaimPassword = 'pass-b';
    let signer3ClaimPassword = 'pass-c';
-   let signer1Hash = await hashIDrissWithPass('a',signer1ClaimPassword);
-   let signer2Hash = await hashIDrissWithPass('b', signer2ClaimPassword);
-   let signer3Hash = await hashIDrissWithPass('c', signer3ClaimPassword);
+   let signer1Hash: string;
+   let signer2Hash: string;
+   let signer3Hash: string;
    let mockToken: MockToken
    let mockToken2: MockToken
    let mockNFT: MockNFT
    let mockNFT2: MockNFT
    let sendToHashMock: SendToHashMock
+   let sendToHashUtilsMock: SendToHashUtilsMock
    let idriss: IDriss
    let mockPriceOracle: MaticPriceAggregatorV3Mock
    let provider: MockProvider
 
    beforeEach(async () => {
-      provider = new MockProvider({ ganacheOptions: { gasLimit: 100000000 } })
+      provider = new MockProvider({ ganacheOptions: { gasLimit: 1000000000 } })
       owner = provider.getSigner(0)
       signer1 = provider.getSigner(1)
       signer2 = provider.getSigner(2)
@@ -67,6 +70,11 @@ describe('SendToHashMock contract', async () => {
       idriss = (await waffle.deployContract(owner, IDrissArtifact, [])) as IDriss
       sendToHashMock = (await waffle.deployContract(owner, SendToHashArtifact,
          [idriss.address, mockPriceOracle.address])) as SendToHashMock
+      sendToHashUtilsMock = (await waffle.deployContract(owner, SendToHashUtilsArtifact, [])) as SendToHashUtilsMock
+
+      signer1Hash = await sendToHashMock.hashIDrissWithPassword('a', signer1ClaimPassword);  
+      signer2Hash = await sendToHashMock.hashIDrissWithPassword('b', signer2ClaimPassword);
+      signer3Hash = await sendToHashMock.hashIDrissWithPassword('c', signer3ClaimPassword);
 
       idriss.addIDriss(signer1Hash, signer1Address)
       idriss.addIDriss(signer2Hash, signer2Address)
@@ -206,6 +214,27 @@ describe('SendToHashMock contract', async () => {
 
       await expect(sendToHashMock.getAddressFromHash('nonexistent'))
          .to.be.revertedWith('IDriss not found.')
+   })
+
+   it ('properly handles hashing IDriss with password', async () => {
+      const testHashes = [
+         await hashIDriss('test1'),
+         await hashIDriss('test2'),
+         await hashIDriss('test3'),
+         await hashIDriss('test4')
+      ]
+
+      const testPassProtectedHashes = [
+         await hashIDrissWithPass(testHashes[0], 'pass1'),
+         await hashIDrissWithPass(testHashes[1], ''),
+         await hashIDrissWithPass(testHashes[2], '4353$%WWSDFgser5ik6l5es09gmsdfg'),
+         await hashIDrissWithPass(testHashes[3], '!@#$%')
+      ]
+
+      expect(await sendToHashUtilsMock.hashIDrissWithPassword(testHashes[0], 'pass1')).to.be.equal(testPassProtectedHashes[0])
+      expect(await sendToHashUtilsMock.hashIDrissWithPassword(testHashes[1], '')).to.be.equal(testPassProtectedHashes[1])
+      expect(await sendToHashUtilsMock.hashIDrissWithPassword(testHashes[2], '4353$%WWSDFgser5ik6l5es09gmsdfg')).to.be.equal(testPassProtectedHashes[2])
+      expect(await sendToHashUtilsMock.hashIDrissWithPassword(testHashes[3], '!@#$%')).to.be.equal(testPassProtectedHashes[3])
    })
 
    it ('properly handles internal mappings when invoking valid sendToAnyone() for coin', async () => {
