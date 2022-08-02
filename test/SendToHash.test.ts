@@ -11,7 +11,7 @@ import SendToHashArtifact from '../src/artifacts/src/contracts/SendToHash.sol/Se
 import chaiAsPromised from 'chai-as-promised'
 import { MockProvider, solidity } from 'ethereum-waffle'
 
-import { hashIDriss, hashIDrissWithPass, negateBigNumber } from './TestUtils'
+import { negateBigNumber } from './TestUtils'
 
 chai.use(solidity) // solidiity matchers, e.g. expect().to.be.revertedWith("message")
 chai.use(chaiAsPromised) //eventually
@@ -240,7 +240,9 @@ describe('SendToHash contract', async () => {
          expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS))
             .to.be.equal(calculatedDollarInWei.div(10))
 
+         await sendToHash.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_COIN, ZERO_ADDRESS)
          await mockToken.approve(sendToHash.address, 5)
+
          expect(() => sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: _95Cents()}))
             .to.changeTokenBalances(mockToken, [owner, sendToHash], [-5, 5]);
 
