@@ -1,21 +1,15 @@
-import { ethers, waffle } from 'hardhat'
+import {  waffle } from 'hardhat'
 import { BigNumber, Signer } from 'ethers'
 import chai, { expect } from 'chai'
-import { IDriss } from '../src/types/IDriss'
 import IDrissArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/IDriss.json'
-import { MaticPriceAggregatorV3Mock } from '../src/types/MaticPriceAggregatorV3Mock'
 import MaticPriceAggregatorV3MockArtifact from '../src/artifacts/src/contracts/mocks/MaticPriceAggregatorV3Mock.sol/MaticPriceAggregatorV3Mock.json'
-import { MockNFT } from '../src/types/MockNFT'
 import MockNFTArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockNFT.json'
 import MockTokenArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockToken.json'
-import { MockToken } from '../src/types/MockToken'
-import { SendToHashMock } from '../src/types/SendToHashMock'
-import { SendToHashUtilsMock } from '../src/types/SendToHashUtilsMock'
+import { MockToken, SendToHashMock, SendToHashUtilsMock, MockNFT, MaticPriceAggregatorV3Mock, IDriss } from '../src/types'
 import SendToHashArtifact from '../src/artifacts/src/contracts/mocks/SendToHashMock.sol/SendToHashMock.json'
 import SendToHashUtilsArtifact from '../src/artifacts/src/contracts/mocks/SendToHashUtilsMock.sol/SendToHashUtilsMock.json'
 import chaiAsPromised from 'chai-as-promised'
 import { MockProvider, solidity } from 'ethereum-waffle'
-import { hashIDriss, hashIDrissWithPass } from './TestUtils'
 
 chai.use(solidity) // solidiity matchers, e.g. expect().to.be.revertedWith("message")
 chai.use(chaiAsPromised) //eventually
@@ -86,8 +80,8 @@ describe('SendToHashMock contract', async () => {
 
       Promise.all(
          NFT_ID_ARRAY.map( async (val, idx, _) => { 
-            await mockNFT.safeMint(ownerAddress, val).catch(e => {})
-            return mockNFT2.safeMint(ownerAddress, val).catch(e => {})
+            await mockNFT.safeMint(ownerAddress, val).catch(_ => {})
+            return mockNFT2.safeMint(ownerAddress, val).catch(_ => {})
          })
       )
    })
@@ -229,8 +223,8 @@ describe('SendToHashMock contract', async () => {
          dollarInWei.add(17)
       ]
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[1]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[0]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[1]})
 
       expect(await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS))
          .to.have.members([signer2Address])
@@ -244,8 +238,8 @@ describe('SendToHashMock contract', async () => {
       expect((await sendToHashMock.getBeneficiaryMapAssetIds(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS, ownerAddress)).length)
          .to.be.equal(0)
 
-      await sendToHashMock.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[3]})
+      await sendToHashMock.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[2]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[3]})
 
       expect(await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS))
          .to.have.members([signer2Address, ownerAddress])
@@ -277,8 +271,8 @@ describe('SendToHashMock contract', async () => {
       await mockToken.approve(sendToHashMock.address, 10000)
       await mockToken.connect(signer2).approve(sendToHashMock.address, 10000)
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 60, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 110, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 60, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 110, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
 
       expect(await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address))
          .to.have.members([signer2Address])
@@ -292,8 +286,8 @@ describe('SendToHashMock contract', async () => {
       expect((await sendToHashMock.getBeneficiaryMapAssetIds(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address, ownerAddress)).length)
          .to.be.equal(0)
 
-      await sendToHashMock.sendToAnyone(signer1Hash, 75, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 90, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 75, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 90, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
 
       expect(await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address))
          .to.have.members([signer2Address, ownerAddress])
@@ -331,8 +325,8 @@ describe('SendToHashMock contract', async () => {
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
 
       expect(await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_NFT, mockNFT.address))
          .to.have.members([signer2Address])
@@ -349,8 +343,8 @@ describe('SendToHashMock contract', async () => {
       expect((await sendToHashMock.getBeneficiaryMapAssetIds(signer1Hash, ASSET_TYPE_NFT, mockNFT.address, ownerAddress)).length)
          .to.be.equal(0)
 
-      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei})
 
       expect(await sendToHashMock.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_NFT, mockNFT.address))
          .to.have.members([signer2Address, ownerAddress])
@@ -391,10 +385,10 @@ describe('SendToHashMock contract', async () => {
          dollarInWei.add(17)
       ]
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[1]})
-      await sendToHashMock.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[3]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[0]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[1]})
+      await sendToHashMock.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[2]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[3]})
 
       await sendToHashMock.connect(signer2).revertPayment(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)
 
@@ -459,10 +453,10 @@ describe('SendToHashMock contract', async () => {
       await mockToken.approve(sendToHashMock.address, 10000)
       await mockToken.connect(signer2).approve(sendToHashMock.address, 10000)
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 60, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 110, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 75, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 90, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 60, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 110, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 75, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 90, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
 
       await sendToHashMock.connect(signer2).revertPayment(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)
 
@@ -543,12 +537,12 @@ describe('SendToHashMock contract', async () => {
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 5, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 5, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei})
 
       await sendToHashMock.connect(signer2).revertPayment(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)
 
@@ -611,10 +605,10 @@ describe('SendToHashMock contract', async () => {
          dollarInWei.add(17)
       ]
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[1]})
-      await sendToHashMock.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[3]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[0]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[1]})
+      await sendToHashMock.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[2]})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[3]})
 
       await sendToHashMock.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_COIN, ZERO_ADDRESS)
 
@@ -663,10 +657,10 @@ describe('SendToHashMock contract', async () => {
       await mockToken.approve(sendToHashMock.address, 10000)
       await mockToken.connect(signer2).approve(sendToHashMock.address, 10000)
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 60, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 110, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 75, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 90, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 60, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 110, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 75, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 90, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
 
       await sendToHashMock.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_TOKEN, mockToken.address)
 
@@ -738,12 +732,12 @@ describe('SendToHashMock contract', async () => {
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 1)
       await mockNFT.connect(signer2).approve(sendToHashMock.address, 2)
 
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, {value: dollarInWei})
-      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 5, {value: dollarInWei})
-      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, "", {value: dollarInWei})
+      await sendToHashMock.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 5, "", {value: dollarInWei})
+      await sendToHashMock.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei})
 
       await sendToHashMock.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_NFT, mockNFT.address)
 

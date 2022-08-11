@@ -73,14 +73,14 @@ describe('SendToHash contract', async () => {
       signer2Hash = await sendToHash.hashIDrissWithPassword(signer2HashForClaim, signer2ClaimPassword);
       signer3Hash = await sendToHash.hashIDrissWithPassword(signer3HashForClaim, signer3ClaimPassword);
 
-      idriss.addIDriss(signer1HashForClaim, signer1Address)
-      idriss.addIDriss(signer2HashForClaim, signer2Address)
-      idriss.addIDriss(signer3HashForClaim, signer3Address)
+      await idriss.addIDriss(signer1HashForClaim, signer1Address)
+      await idriss.addIDriss(signer2HashForClaim, signer2Address)
+      await idriss.addIDriss(signer3HashForClaim, signer3Address)
 
-      Promise.all(
+      await Promise.all(
          NFT_ID_ARRAY.map( async (val, idx, _) => { 
-            await mockNFT.safeMint(ownerAddress, val).catch(e => {console.log(e)})
-            return mockNFT2.safeMint(ownerAddress, val).catch(e => {console.log(e)})
+            await mockNFT.safeMint(ownerAddress, val).catch(_ => {})
+            return mockNFT2.safeMint(ownerAddress, val).catch(_ => {})
          })
       )
    })
@@ -94,7 +94,7 @@ describe('SendToHash contract', async () => {
          value: ethers.utils.parseEther('30.0')
       });
       
-      await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_NFT, reentrancyContract.address, 1, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_NFT, reentrancyContract.address, 1, "", {value: dollarInWei}))
          .to.be.revertedWith('ReentrancyGuard: reentrant call')
 
       expect (await reentrancyContract.reentrancyCounter()).to.be.equal(0)
@@ -109,7 +109,7 @@ describe('SendToHash contract', async () => {
          value: ethers.utils.parseEther('30.0')
       })
       
-      await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, reentrancyContract.address, 1, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, reentrancyContract.address, 1, "", {value: dollarInWei}))
          .to.be.revertedWith('ReentrancyGuard: reentrant call')
 
       expect (await reentrancyContract.reentrancyCounter()).to.be.equal(0)
@@ -133,40 +133,40 @@ describe('SendToHash contract', async () => {
    })
 
    it('reverts sendToAnyone() when MATIC value is zero', async () => {
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, ""))
          .to.be.revertedWith('Value sent is smaller than minimal fee.')
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0, ""))
          .to.be.revertedWith('Value sent is smaller than minimal fee.')
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_NFT, ZERO_ADDRESS, 0))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, ""))
          .to.be.revertedWith('Value sent is smaller than minimal fee.')
    })
 
    it ('reverts sendToAnyone() when an incorrect asset type is passed', async () => {
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, 5, ZERO_ADDRESS, 0)).to.be.reverted
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, 5, ZERO_ADDRESS, 0, "")).to.be.reverted
    })
 
    it ('reverts sendToAnyone() when asset address is 0', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       
-      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_TOKEN, ZERO_ADDRESS, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('Asset address cannot be 0')
-      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, ZERO_ADDRESS, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('Asset address cannot be 0')
    })
 
    it ('reverts sendToAnyone() when assetContractAddress is not an existing contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, signer1Address, 0, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, signer1Address, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('Asset address is not a contract')
    })
 
    it ('reverts sendToAnyone() when asset amount is 0', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('Asset amount has to be bigger than 0')
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('Asset amount has to be bigger than 0')
    })
 
@@ -179,14 +179,14 @@ describe('SendToHash contract', async () => {
       await mockToken.connect(signer1).approve(sendToHash.address, 5)
       expect(await mockToken.allowance(signer1Address, sendToHash.address)).to.be.equal(5)
 
-      await expect(sendToHash.connect(signer1).sendToAnyone(signer2Hash, 10, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(sendToHash.connect(signer1).sendToAnyone(signer2Hash, 10, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('ERC20: insufficient allowance')
    })
 
    it ('reverts sendToAnyone() when sender is not allowed to send an NFT', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await expect(sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+      await expect(sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei}))
          .to.be.revertedWith('ERC721: transfer caller is not owner nor approved')
    })
 
@@ -194,17 +194,17 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       const payments = [dollarInWei.add(100), dollarInWei.add(2500), dollarInWei.add(968)]
 
-      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken.address, 0, {value: payments[0]}))
+      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken.address, 0, "", {value: payments[0]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payments[0]), payments[0]])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(100)
 
-      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockNFT.address, 0, {value: payments[1]}))
+      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockNFT.address, 0, "", {value: payments[1]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payments[1]), payments[1]])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockToken.address)).to.be.equal(100 + 2500)
 
-      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: payments[2]}))
+      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: payments[2]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payments[2]), payments[2]])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockNFT.address)).to.be.equal(100 + 2500 + 968)
@@ -235,7 +235,7 @@ describe('SendToHash contract', async () => {
 
          expect(calculatedDollarInWei).to.be.equal(dollarInWei)
 
-         expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken.address, 0, {value: _110Cents()}))
+         expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken.address, 0, "", {value: _110Cents()}))
             .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(_110Cents()), _110Cents()]);
          expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS))
             .to.be.equal(calculatedDollarInWei.div(10))
@@ -243,13 +243,13 @@ describe('SendToHash contract', async () => {
          await sendToHash.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_COIN, ZERO_ADDRESS)
          await mockToken.approve(sendToHash.address, 5)
 
-         expect(() => sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: _95Cents()}))
+         expect(() => sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: _95Cents()}))
             .to.changeTokenBalances(mockToken, [owner, sendToHash], [-5, 5]);
 
-         await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: _94Cents()}))
+         await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: _94Cents()}))
             .to.be.revertedWith('Value sent is smaller than minimal fee.')
 
-         await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken.address, 0, {value: calculatedDollarInWei}))
+         await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken.address, 0, "", {value: calculatedDollarInWei}))
             .to.be.revertedWith('Transferred value has to be bigger than 0')
       }
    })
@@ -260,7 +260,7 @@ describe('SendToHash contract', async () => {
 
       await mockToken.approve(sendToHash.address, 5)
 
-      await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: minimalFee}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: minimalFee}))
          .to.be.revertedWith('Value sent is smaller than minimal fee.')
    })
 
@@ -270,7 +270,7 @@ describe('SendToHash contract', async () => {
 
       await mockToken.approve(sendToHash.address, 5)
 
-      expect(await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: minimalFee}))
+      expect(await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: minimalFee}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(minimalFee), minimalFee])
    })
 
@@ -279,7 +279,7 @@ describe('SendToHash contract', async () => {
 
       await mockToken.approve(sendToHash.address, 5)
 
-      expect(await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      expect(await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(dollarInWei), dollarInWei])
    })
 
@@ -288,7 +288,7 @@ describe('SendToHash contract', async () => {
       const valueToTransfer = dollarInWei.mul(250)
       const expectedFee = valueToTransfer.div(100)
 
-      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: valueToTransfer}))
+      expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: valueToTransfer}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(valueToTransfer), valueToTransfer])
 
       const accountBalance = (await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)).toString()
@@ -301,10 +301,10 @@ describe('SendToHash contract', async () => {
       const minimumAcceptablePayment = dollarInWei.add(1)
       const minimumAcceptablePaymentNegated = negateBigNumber(minimumAcceptablePayment)
 
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: dollarInWei}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('Transferred value has to be bigger than 0')
 
-      await expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: minimumAcceptablePayment}))
+      await expect(await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: minimumAcceptablePayment}))
          .to.changeEtherBalances([owner, sendToHash], [minimumAcceptablePaymentNegated, minimumAcceptablePayment])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(1)
@@ -317,12 +317,12 @@ describe('SendToHash contract', async () => {
       await mockToken.transfer(signer1Address, 500)
       await mockToken.connect(signer1).approve(sendToHash.address, 300)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-100, 100])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(100)
 
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-300, 300])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(100)
@@ -341,20 +341,20 @@ describe('SendToHash contract', async () => {
       await mockNFT.transferFrom(ownerAddress, signer1Address, 4)
       await mockNFT.connect(signer1).approve(sendToHash.address, 4)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(2)
 
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(2)
@@ -368,18 +368,18 @@ describe('SendToHash contract', async () => {
       await mockToken.transfer(signer1Address, 500)
       await mockToken.connect(signer1).approve(sendToHash.address, 300)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-100, 100])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 250, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 250, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [-250, 250])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(350)
 
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-300, 300])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 20, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 20, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [-20, 20])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(350)
@@ -398,38 +398,38 @@ describe('SendToHash contract', async () => {
       await mockNFT.transferFrom(ownerAddress, signer1Address, 4)
       await mockNFT.connect(signer1).approve(sendToHash.address, 4)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(2)
 
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
 
       await mockToken.approve(sendToHash.address, 500)
       await mockToken.transfer(signer1Address, 500)
       await mockToken.connect(signer1).approve(sendToHash.address, 300)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-100, 100])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 250, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 250, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [-250, 250])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(350)
 
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-300, 300])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 20, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 20, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [-20, 20])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(350)
@@ -451,10 +451,10 @@ describe('SendToHash contract', async () => {
       await mockNFT.connect(signer1).approve(sendToHash.address, 4)
 
       // send NFT
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
@@ -469,12 +469,12 @@ describe('SendToHash contract', async () => {
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(0)
       expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(0)
 
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
 
       // additionally send tokens
@@ -482,10 +482,10 @@ describe('SendToHash contract', async () => {
       await mockToken.transfer(signer1Address, 500)
       await mockToken.connect(signer1).approve(sendToHash.address, 300)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-100, 100])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [-300, 300])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(100)
@@ -521,16 +521,16 @@ describe('SendToHash contract', async () => {
       await mockToken2.transfer(signer2Address, 500)
       await mockToken2.connect(signer2).approve(sendToHash.address, 700)
 
-      await expect(() => sendToHash.connect(signer2).sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer2).sendToAnyone(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer2, sendToHash], [-100, 100])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 300, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [-300, 300])
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 200, ASSET_TYPE_TOKEN, mockToken2.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 200, ASSET_TYPE_TOKEN, mockToken2.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken2, [owner, sendToHash], [-200, 200])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 90, ASSET_TYPE_TOKEN, mockToken2.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 90, ASSET_TYPE_TOKEN, mockToken2.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken2, [signer1, sendToHash], [-90, 90])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(100)
@@ -538,16 +538,16 @@ describe('SendToHash contract', async () => {
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken2.address)).to.be.equal(200)
       expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_TOKEN, mockToken2.address)).to.be.equal(90)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [-50, 50])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 10, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 10, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [-10, 10])
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 17, ASSET_TYPE_TOKEN, mockToken2.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 17, ASSET_TYPE_TOKEN, mockToken2.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken2, [owner, sendToHash], [-17, 17])
 
-      await expect(() => sendToHash.connect(signer2).sendToAnyone(signer2Hash, 33, ASSET_TYPE_TOKEN, mockToken2.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer2).sendToAnyone(signer2Hash, 33, ASSET_TYPE_TOKEN, mockToken2.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockToken2, [signer2, sendToHash], [-33, 33])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(150)
@@ -574,19 +574,19 @@ describe('SendToHash contract', async () => {
          dollarInWei.add(17)
       ]
 
-      await expect(() => sendToHash.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]}))
+      await expect(() => sendToHash.connect(signer2).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[0]}))
          .to.changeEtherBalances([signer2, sendToHash], [negateBigNumber(prices[0]), prices[0]])
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, {value: prices[1]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, "", {value: prices[1]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[1]), prices[1]])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockToken.address)).to.be.equal(10230)
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockToken2.address)).to.be.equal(10230)
 
-      await expect(() => sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]}))
+      await expect(() => sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[2]}))
          .to.changeEtherBalances([signer3, sendToHash], [negateBigNumber(prices[2]), prices[2]])
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, {value: prices[3]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, "", {value: prices[3]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[3]), prices[3]])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockToken.address)).to.be.equal(10297)
@@ -616,18 +616,18 @@ describe('SendToHash contract', async () => {
          dollarInWei.add(333334)
       ]
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[0]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[0]), prices[0]])
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, {value: prices[1]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, "", {value: prices[1]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[1]), prices[1]])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockToken.address)).to.be.equal(234000 + 850)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[2]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[2]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[2]), prices[2]])
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, {value: prices[3]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, "", {value: prices[3]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[3]), prices[3]])
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockToken2.address)).to.be.equal(totalPaymentsValue)
 
@@ -658,19 +658,19 @@ describe('SendToHash contract', async () => {
       await mockNFT2.connect(signer1).approve(sendToHash.address, 9)
 
       // send NFT
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
       expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(1)
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT2.address, 5, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT2.address, 5, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT2, [owner, sendToHash], [-1, 1])
 
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT2.address, 6, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT2.address, 6, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT2, [signer1, sendToHash], [-1, 1])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT2.address)).to.be.equal(2)
@@ -687,11 +687,11 @@ describe('SendToHash contract', async () => {
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT2.address)).to.be.equal(1)
       expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_NFT, mockNFT2.address)).to.be.equal(0)
 
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, {value: dollarInWei}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer2Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 4, "", {value: dollarInWei}))
          .to.changeTokenBalances(mockNFT, [signer1, sendToHash], [-1, 1])
    })
 
@@ -715,27 +715,27 @@ describe('SendToHash contract', async () => {
       await mockNFT.connect(signer1).approve(sendToHash.address, 3)
 
       currentFees = fees[0]
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: fees[0]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: fees[0]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(fees[0]), fees[0]])
       expect(await sendToHash.paymentFeesBalance()).to.be.equal(currentFees)
 
       currentFees = currentFees.add(fees[1])
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 23, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: fees[1]}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 23, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: fees[1]}))
          .to.changeEtherBalances([signer1, sendToHash], [negateBigNumber(fees[1]), fees[1]])
       expect(await sendToHash.paymentFeesBalance()).to.be.equal(currentFees)
 
       currentFees = currentFees.add(fees[2])
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: fees[2]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: fees[2]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(fees[2]), fees[2]])
       expect(await sendToHash.paymentFeesBalance()).to.be.equal(currentFees)
 
       currentFees = currentFees.add(fees[3])
-      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, {value: fees[3]}))
+      await expect(() => sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 3, "", {value: fees[3]}))
          .to.changeEtherBalances([signer1, sendToHash], [negateBigNumber(fees[3]), fees[3]])
       expect(await sendToHash.paymentFeesBalance()).to.be.equal(currentFees)
 
       currentFees = currentFees.add(dollarInWei)
-      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, {value: payment}))
+      await expect(() => sendToHash.sendToAnyone(signer2Hash, 1, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, "", {value: payment}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payment), payment])
       expect(await sendToHash.paymentFeesBalance()).to.be.equal(currentFees)
 
@@ -747,7 +747,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       const payment = dollarInWei.add(10000)
 
-      expect(await sendToHash.sendToAnyone(signer3Hash, 1, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, {value: payment}))
+      expect(await sendToHash.sendToAnyone(signer3Hash, 1, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, "", {value: payment}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(payment), payment])
 
       await expect(sendToHash.connect(signer1).claimPaymentFees())
@@ -760,7 +760,7 @@ describe('SendToHash contract', async () => {
       for (let i = 0; i < 10; i++) {
          await mockNFT.approve(sendToHash.address, 1)
 
-         await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+         await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei}))
             .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
          expect(await mockNFT.ownerOf(1)).to.be.equal(sendToHash.address)
@@ -772,7 +772,7 @@ describe('SendToHash contract', async () => {
 
          await mockNFT.approve(sendToHash.address, 1)
 
-         await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei}))
+         await expect(() => sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei}))
             .to.changeTokenBalances(mockNFT, [owner, sendToHash], [-1, 1])
 
          expect(await mockNFT.ownerOf(1)).to.be.equal(sendToHash.address)
@@ -793,7 +793,7 @@ describe('SendToHash contract', async () => {
       for (let i = 0; i < 10; i++) {
          await mockToken.approve(sendToHash.address, 50)
 
-         await expect(() => sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei}))
+         await expect(() => sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
             .to.changeTokenBalances(mockToken, [owner, sendToHash], [-50, 50])
 
          expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(50)
@@ -805,7 +805,7 @@ describe('SendToHash contract', async () => {
 
          await mockToken.approve(sendToHash.address, 150)
 
-         await expect(() => sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_TOKEN, mockToken.address, 1, {value: dollarInWei}))
+         await expect(() => sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_TOKEN, mockToken.address, 1, "", {value: dollarInWei}))
             .to.changeTokenBalances(mockToken, [owner, sendToHash], [-150, 150])
 
          expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(150)
@@ -832,7 +832,7 @@ describe('SendToHash contract', async () => {
    it ('performs moveAssetToOtherHash() for native currency', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_COIN, mockToken.address, 0, {value: dollarInWei.add(1345)})
+      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_COIN, mockToken.address, 0, "", {value: dollarInWei.add(1345)})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer3Hash, ASSET_TYPE_COIN, mockToken.address)
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(0)
@@ -843,7 +843,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       await mockToken.approve(sendToHash.address, 150)
 
-      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer3Hash, ASSET_TYPE_TOKEN, mockToken.address)
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(0)
@@ -854,7 +854,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       await mockNFT.approve(sendToHash.address, 1)
 
-      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer3Hash, ASSET_TYPE_NFT, mockNFT.address)
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(0)
@@ -865,7 +865,7 @@ describe('SendToHash contract', async () => {
    it ('allows user to claim native currency from new hash after moveAssetToOtherHash()', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_COIN, mockToken.address, 0, {value: dollarInWei.add(1345)})
+      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_COIN, mockToken.address, 0, "", {value: dollarInWei.add(1345)})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer3Hash, ASSET_TYPE_COIN, mockToken.address)
 
       await expect(() => sendToHash.connect(signer3).claim(signer3HashForClaim, signer3ClaimPassword, ASSET_TYPE_COIN, mockToken.address))
@@ -876,7 +876,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
       await mockNFT.approve(sendToHash.address, 1)
-      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_NFT, mockNFT.address)
 
       await expect(() => sendToHash.connect(signer2).claim(signer2HashForClaim, signer2ClaimPassword, ASSET_TYPE_NFT, mockNFT.address))
@@ -887,7 +887,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
       await mockToken.approve(sendToHash.address, 150)
-      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 150, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_TOKEN, mockToken.address)
 
       await expect(() => sendToHash.connect(signer2).claim(signer2HashForClaim, signer2ClaimPassword, ASSET_TYPE_TOKEN, mockToken.address))
@@ -897,7 +897,7 @@ describe('SendToHash contract', async () => {
    it ('properly handles moving native coins multiple times in moveAssetToOtherHash()', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: dollarInWei.add(1000)})
+      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: dollarInWei.add(1000)})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)
       await sendToHash.moveAssetToOtherHash(signer2Hash, signer3Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)
       await sendToHash.moveAssetToOtherHash(signer3Hash, signer2Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)
@@ -911,7 +911,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       await mockNFT.approve(sendToHash.address, 0)
 
-      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_NFT, mockNFT.address)
       await sendToHash.moveAssetToOtherHash(signer2Hash, signer3Hash, ASSET_TYPE_NFT, mockNFT.address)
       await sendToHash.moveAssetToOtherHash(signer3Hash, signer2Hash, ASSET_TYPE_NFT, mockNFT.address)
@@ -928,9 +928,9 @@ describe('SendToHash contract', async () => {
       await mockNFT.approve(sendToHash.address, 1)
       await mockNFT.approve(sendToHash.address, 2)
 
-      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 0, {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_NFT, mockNFT.address)
 
       expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_NFT, mockNFT.address)).to.be.equal(3)
@@ -944,7 +944,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       await mockToken.approve(sendToHash.address, 50)
 
-      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_TOKEN, mockToken.address)
       await sendToHash.moveAssetToOtherHash(signer2Hash, signer3Hash, ASSET_TYPE_TOKEN, mockToken.address)
       await sendToHash.moveAssetToOtherHash(signer3Hash, signer2Hash, ASSET_TYPE_TOKEN, mockToken.address)
@@ -960,9 +960,9 @@ describe('SendToHash contract', async () => {
       await mockToken.approve(sendToHash.address, 50)
       await mockNFT.approve(sendToHash.address, 1)
 
-      await sendToHash.sendToAnyone(signer3Hash, 50, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, {value: dollarInWei.add(1500)})
-      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer2Hash, 50, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer3Hash, 50, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, "", {value: dollarInWei.add(1500)})
+      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer2Hash, 50, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer3Hash, signer2Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_TOKEN, mockToken.address)
       await sendToHash.moveAssetToOtherHash(signer2Hash, signer3Hash, ASSET_TYPE_NFT, mockNFT.address)
@@ -988,7 +988,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
       await mockToken.approve(sendToHash.address, 50)
-      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
 
       await expect(() => sendToHash.revertPayment(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address))
          .to.changeTokenBalances(mockToken, [owner, sendToHash], [5, -5])
@@ -1002,7 +1002,7 @@ describe('SendToHash contract', async () => {
 
       await mockToken.transfer(signer1Address, 50)
       await mockToken.connect(signer1).approve(sendToHash.address, 50)
-      await sendToHash.connect(signer1).sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHash.connect(signer1).sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
 
       await expect(() => sendToHash.connect(signer1).revertPayment(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [5, -5])
@@ -1016,9 +1016,9 @@ describe('SendToHash contract', async () => {
       await mockToken.approve(sendToHash.address, 50)
       await mockNFT.approve(sendToHash.address, 1)
 
-      await sendToHash.sendToAnyone(signer3Hash, 50, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, {value: dollarInWei.add(1500)})
-      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer2Hash, 50, ASSET_TYPE_NFT, mockNFT.address, 1, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer3Hash, 50, ASSET_TYPE_COIN, ZERO_ADDRESS, 1, "", {value: dollarInWei.add(1500)})
+      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer2Hash, 50, ASSET_TYPE_NFT, mockNFT.address, 1, "", {value: dollarInWei})
 
       await expect(sendToHash.connect(signer1).claim(signer1HashForClaim, 'wrongpass', ASSET_TYPE_COIN, ZERO_ADDRESS))
          .to.be.revertedWith('Nothing to claim.')
@@ -1056,13 +1056,13 @@ describe('SendToHash contract', async () => {
 
       await mockNFT.approve(sendToHash.address, 2)
       await mockToken.approve(sendToHash.address, 50)
-      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei})
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: prices[0]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: prices[0]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[0]), prices[0]])
 
-      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, {value: prices[1]}))
+      await expect(() => sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, mockToken2.address, 0, "", {value: prices[1]}))
          .to.changeEtherBalances([owner, sendToHash], [negateBigNumber(prices[1]), prices[1]])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, mockToken.address)).to.be.equal(234000 + 850)
@@ -1093,9 +1093,9 @@ describe('SendToHash contract', async () => {
 
       await mockNFT.approve(sendToHash.address, 2)
       await mockToken.approve(sendToHash.address, 50)
-      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: dollarInWei})
-      await sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: payment})
+      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei})
+      await sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: payment})
 
       await expect(sendToHash.connect(signer2).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_TOKEN, mockToken.address))
          .to.be.revertedWith('Only owner can claim payments.')
@@ -1120,10 +1120,10 @@ describe('SendToHash contract', async () => {
 
       await mockNFT.approve(sendToHash.address, 2)
       await mockToken.approve(sendToHash.address, 50)
-      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: newMinimalFee.mul(95).div(100)})
-      await sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: payment})
+      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: newMinimalFee.mul(95).div(100)})
+      await sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: payment})
 
-      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, {value: newMinimalFee.div(2)}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: newMinimalFee.div(2)}))
          .to.be.revertedWith('Value sent is smaller than minimal fee.')
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(2345000)
@@ -1140,8 +1140,8 @@ describe('SendToHash contract', async () => {
 
       await mockNFT.approve(sendToHash.address, 2)
       await mockToken.approve(sendToHash.address, 50)
-      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei.mul(95).div(100)})
-      await sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, {value: payment})
+      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei.mul(95).div(100)})
+      await sendToHash.connect(signer3).sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, ZERO_ADDRESS, 0, "", {value: payment})
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS)).to.be.equal(payment.sub(paymentFee))
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address)).to.be.equal(5)
@@ -1174,7 +1174,7 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
       await mockToken.approve(sendToHash.address, 50)
-      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 5, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei})
 
       await expect(() => sendToHash.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_TOKEN, mockToken.address))
          .to.changeTokenBalances(mockToken, [signer1, sendToHash], [5, -5])
@@ -1186,17 +1186,33 @@ describe('SendToHash contract', async () => {
    it ('emits events on successful function invocations', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, signer1Address, 0, {value: dollarInWei.add(99999)}))
+      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, signer1Address, 0, "message from event!", {value: dollarInWei.add(99999)}))
          .to.emit(sendToHash, 'AssetTransferred')
-         .withArgs(signer1Hash, ownerAddress, ZERO_ADDRESS, 99999);
+         .withArgs(signer1Hash, ownerAddress, ZERO_ADDRESS, 99999, ASSET_TYPE_COIN, "message from event!");
 
       await expect(sendToHash.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_COIN, ZERO_ADDRESS))
          .to.emit(sendToHash, 'AssetClaimed')
-         .withArgs(signer1Hash, signer1Address, ZERO_ADDRESS, 99999);
+         .withArgs(signer1Hash, signer1Address, ZERO_ADDRESS, 99999, ASSET_TYPE_COIN);
 
-      await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, signer1Address, 0, {value: dollarInWei.add(99999)})
+      await sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_COIN, signer1Address, 0, "", {value: dollarInWei.add(99999)})
       await expect(sendToHash.revertPayment(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS))
          .to.emit(sendToHash, 'AssetTransferReverted')
-         .withArgs(signer1Hash, ownerAddress, ZERO_ADDRESS, 99999);
+         .withArgs(signer1Hash, ownerAddress, ZERO_ADDRESS, 99999, ASSET_TYPE_COIN);
+
+      //NFT
+      await mockNFT.approve(sendToHash.address, 1)
+      await expect(sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 1, "message from event!", {value: dollarInWei}))
+          .to.emit(sendToHash, 'AssetTransferred')
+          .withArgs(signer1Hash, ownerAddress, mockNFT.address, 1, ASSET_TYPE_NFT, "message from event!");
+
+      await expect(sendToHash.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_NFT, mockNFT.address))
+          .to.emit(sendToHash, 'AssetClaimed')
+          .withArgs(signer1Hash, signer1Address, mockNFT.address, 1, ASSET_TYPE_NFT);
+
+      await mockNFT.approve(sendToHash.address, 2)
+      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_NFT, mockNFT.address, 2, "", {value: dollarInWei.add(1)})
+      await expect(sendToHash.revertPayment(signer1Hash, ASSET_TYPE_NFT, mockNFT.address))
+          .to.emit(sendToHash, 'AssetTransferReverted')
+          .withArgs(signer1Hash, ownerAddress, mockNFT.address, 1, ASSET_TYPE_NFT);
    })
 })
