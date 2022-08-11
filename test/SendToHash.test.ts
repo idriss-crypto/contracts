@@ -166,8 +166,6 @@ describe('SendToHash contract', async () => {
 
       await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_TOKEN, mockToken.address, 0, "", {value: dollarInWei}))
          .to.be.revertedWith('Asset amount has to be bigger than 0')
-      await expect(sendToHash.sendToAnyone(signer1Hash, 0, ASSET_TYPE_NFT, mockNFT.address, 0, "", {value: dollarInWei}))
-         .to.be.revertedWith('Asset amount has to be bigger than 0')
    })
 
    it ('reverts sendToAnyone() when receiver does not have allowance for a token', async () => {
