@@ -49,7 +49,7 @@ describe('SendToHashMock contract', async () => {
    let provider: MockProvider
 
    beforeEach(async () => {
-      provider = new MockProvider({ ganacheOptions: { gasLimit: 5000000000 } })
+      provider = new MockProvider({ ganacheOptions: { gasLimit: '50000000000' } })
       owner = provider.getSigner(0)
       signer1 = provider.getSigner(1)
       signer2 = provider.getSigner(2)
@@ -73,12 +73,12 @@ describe('SendToHashMock contract', async () => {
       signer2Hash = await sendToHashMock.hashIDrissWithPassword(signer2HashForClaim, signer2ClaimPassword);
       signer3Hash = await sendToHashMock.hashIDrissWithPassword(signer3HashForClaim, signer3ClaimPassword);
 
-      idriss.addIDriss(signer1HashForClaim, signer1Address)
-      idriss.addIDriss(signer2HashForClaim, signer2Address)
-      idriss.addIDriss(signer3HashForClaim, signer3Address)
-      idriss.addIDriss('0', ZERO_ADDRESS)
+      await idriss.addIDriss(signer1HashForClaim, signer1Address)
+      await idriss.addIDriss(signer2HashForClaim, signer2Address)
+      await idriss.addIDriss(signer3HashForClaim, signer3Address)
+      await idriss.addIDriss('0', ZERO_ADDRESS)
 
-      Promise.all(
+      await Promise.all(
          NFT_ID_ARRAY.map( async (val, idx, _) => { 
             await mockNFT.safeMint(ownerAddress, val).catch(_ => {})
             return mockNFT2.safeMint(ownerAddress, val).catch(_ => {})
