@@ -49,7 +49,7 @@ describe('SendToHashMock contract', async () => {
    let provider: MockProvider
 
    beforeEach(async () => {
-      provider = new MockProvider({ ganacheOptions: { gasLimit: 1000000000 } })
+      provider = new MockProvider({ ganacheOptions: { gasLimit: 5000000000 } })
       owner = provider.getSigner(0)
       signer1 = provider.getSigner(1)
       signer2 = provider.getSigner(2)
