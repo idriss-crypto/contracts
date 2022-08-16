@@ -132,6 +132,54 @@ describe('SendToHashMock contract', async () => {
       expect(value6).to.be.equal(dollarInWei.mul(1188))
    })
 
+   it ('properly calculates fee for ERC20 & ERC721', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+
+      const paymentFeeToken = await sendToHashMock.getPaymentFee(dollarInWei.mul(1000), ASSET_TYPE_TOKEN)
+      const paymentFeeNFT = await sendToHashMock.getPaymentFee(dollarInWei.mul(564), ASSET_TYPE_NFT)
+
+      expect(paymentFeeToken).to.be.equal(dollarInWei)
+      expect(paymentFeeNFT).to.be.equal(dollarInWei)
+   })
+
+   it ('properly calculates fee for native currency', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+
+      const paymentFee0 = await sendToHashMock.getPaymentFee(dollarInWei.mul(95).div(100), ASSET_TYPE_COIN)
+      const paymentFee1 = await sendToHashMock.getPaymentFee(dollarInWei.mul(1), ASSET_TYPE_COIN)
+      const paymentFee2 = await sendToHashMock.getPaymentFee(dollarInWei.mul(10), ASSET_TYPE_COIN)
+      const paymentFee3 = await sendToHashMock.getPaymentFee(dollarInWei.mul(100), ASSET_TYPE_COIN)
+      const paymentFee4 = await sendToHashMock.getPaymentFee(dollarInWei.mul(101), ASSET_TYPE_COIN)
+      const paymentFee5 = await sendToHashMock.getPaymentFee(dollarInWei.mul(555), ASSET_TYPE_COIN)
+
+      expect(paymentFee0).to.be.equal(dollarInWei) // we accept slippage, but won't count in for it here
+      expect(paymentFee1).to.be.equal(dollarInWei)
+      expect(paymentFee2).to.be.equal(dollarInWei)
+      expect(paymentFee3).to.be.equal(dollarInWei)
+      expect(paymentFee4).to.be.equal(dollarInWei.mul(101).div(100))
+      expect(paymentFee5).to.be.equal(dollarInWei.mul(555).div(100))
+   })
+
+   it ('properly calculates fee after changing percentage fee', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      let currentFee = dollarInWei.mul(2)
+      const payments = [
+         dollarInWei.mul(100), //100$
+         dollarInWei.mul(200), //200$ + 245_000
+      ]
+
+      await sendToHashMock.changePaymentFeePercentage(2, 100)
+      const [fee, value] = await sendToHashMock.splitPayment(payments[0])
+      expect(fee).to.be.equal(currentFee)
+      expect(value).to.be.equal(dollarInWei.mul(98))
+
+      currentFee = dollarInWei.mul(3)
+      await sendToHashMock.changePaymentFeePercentage(15, 1000)
+      const [fee1, value1] = await sendToHashMock.splitPayment(payments[1])
+      expect(fee1).to.be.equal(currentFee)
+      expect(value1).to.be.equal(dollarInWei.mul(197))
+   })
+
    it ('properly calculates fee after changing minimal fee', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       let currentFee = dollarInWei.mul(10)
