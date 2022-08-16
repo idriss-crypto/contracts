@@ -47,5 +47,5 @@ interface ISendToHash {
     function getPaymentFee(
         uint256 _value,
         AssetType _assetType
-    ) public view returns (uint256);
+    ) external view returns (uint256);
 }
