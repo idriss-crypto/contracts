@@ -1,0 +1,37 @@
+{
+  "name": "idriss",
+  "version": "1.0.0",
+  "scripts": {
+    "slither": "slither src/contracts/SendToHash.sol --solc-remaps @=node_modules/@ --hardhat-artifacts-directory src/artifacts",
+    "mythril": "myth a src/contracts/SendToHash.sol --solc-json ./mythril.config.json",
+    "test": "npx hardhat test",
+    "deploy-dev":  "NODE_ENV=development env-cmd -f .env.dev  npx hardhat run scripts/deploy.ts --network ganache",
+    "deploy-test": "NODE_ENV=development env-cmd -f .env.test npx hardhat run scripts/deploy.ts --network mumbai",
+    "deploy-prod": "NODE_ENV=production  env-cmd -f .env.prod npx hardhat run scripts/deploy.ts --network polygon_mainnet"
+  },
+  "author": "Rafal Kalinowski",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.3",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@typechain/ethers-v5": "^7.2.0",
+    "@typechain/hardhat": "^2.3.1",
+    "@types/chai": "^4.2.22",
+    "@types/chai-as-promised": "^7.1.5",
+    "@types/mocha": "^9.0.0",
+    "chai": "^4.3.6",
+    "chai-as-promised": "^7.1.1",
+    "dotenv": "^10.0.0",
+    "ethereum-waffle": "^3.4.0",
+    "ethers": "^5.5.2",
+    "hardhat": "^2.7.0",
+    "ts-node": "^10.8.1",
+    "typechain": "^5.2.0",
+    "typescript": "^4.7.3"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^0.4.1",
+    "@openzeppelin/contracts": "^4.6.0",
+    "env-cmd": "^10.1.0"
+  }
+}
