@@ -64,6 +64,11 @@ contract IDrissMappings {
     error IDrissMappings__OnlyIDrissOwnerCanChangeOwnership();
     error IDrissMappings__OnlyContractOwnerCanChangeOwnership();
     error IDrissMappings__Ownable_NewContractOwnerIsTheZeroAddress();
+    error IDrissMappings__FailedToWithdraw();
+    error IDrissMappings__CannotChangeExistingBinding();
+    error IDrissMappings__NotEnough_MATIC();
+    error IDrissMappings__BindingDoesNotExist();
+    error IDrissMappings__BindingAlreadyCreated();
 
     function addAdmin(address adminAddress) external {
         if (msg.sender != contractOwner) {
@@ -97,7 +102,7 @@ contract IDrissMappings {
             value: address(this).balance,
             gas: 40000
         }("");
-        require(sent, "Failed to  withdraw.");
+        if(!sent) {revert IDrissMappings__FailedToWithdraw();}
         return data;
     }
 
@@ -128,11 +133,10 @@ contract IDrissMappings {
         if (admins[msg.sender] != true) {
             revert IDrissMappings__OnlyTrustedAdminCanAddIDriss();
         }
-        require(
-            keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes("")),
-            "Cannot change existing binding."
-        );
-        require(msg.value >= price, "Not enough MATIC.");
+        if(keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes(""))) {
+            revert IDrissMappings__CannotChangeExistingBinding();
+        }
+        if(msg.value < price){ revert IDrissMappings__NotEnough_MATIC();}
         IDriss[hashID] = address_;
         IDrissHash[hashPub] = hashID;
         IDrissOwners[hashPub] = ownerAddress;
@@ -152,10 +156,9 @@ contract IDrissMappings {
         if (admins[msg.sender] != true) {
             revert IDrissMappings__OnlyTrustedAdminCanAddIDriss();
         }
-        require(
-            keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes("")),
-            "Binding already created."
-        );
+        if(keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes(""))) {
+            revert IDrissMappings__BindingAlreadyCreated();
+        }
         ERC20 paymentTc = ERC20(token);
         require(
             paymentTc.allowance(msg.sender, address(this)) >= amount,
@@ -177,10 +180,9 @@ contract IDrissMappings {
         if (IDrissOwners[hashPub] != msg.sender) {
             revert IDrissMappings__OnlyIDrissOwnerCanDeleteBinding();
         }
-        require(
-            keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes("")),
-            "Binding does not exist."
-        );
+        if(keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes(""))){
+            revert IDrissMappings__BindingDoesNotExist();
+        }
         delete IDriss[IDrissHash[hashPub]];
         delete IDrissHash[hashPub];
         delete IDrissOwners[hashPub];
@@ -194,10 +196,9 @@ contract IDrissMappings {
         view
         returns (string memory)
     {
-        require(
-            keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes("")),
-            "Binding does not exist."
-        );
+        if(keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes(""))){
+            revert IDrissMappings__BindingDoesNotExist();
+        }
         return IDriss[IDrissHash[hashPub]];
     }
 
