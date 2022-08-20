@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity 0.8.7;
 
 import { SendToHash } from "../SendToHash.sol";
 import { ConversionUtils } from "../libs/ConversionUtils.sol";
