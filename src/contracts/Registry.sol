@@ -28,9 +28,9 @@ interface ERC20 {
 }
 
 contract IDrissMappings {
-    uint public countAdding = 0;
-    uint public countDeleting = 0;
-    uint public price = 0;
+    uint public countAdding;
+    uint public countDeleting;
+    uint public price;
     uint public creationTime = block.timestamp;
     address public contractOwner = msg.sender;
     mapping(string => string) private IDriss;
