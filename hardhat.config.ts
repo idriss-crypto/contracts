@@ -15,7 +15,15 @@ task('accounts', 'print all accounts', async (args, hre) => {
 })
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.7",
+  solidity: {
+    version: '0.8.7',
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  },
   typechain: {
     outDir: 'src/types',
     target: 'ethers-v5',
