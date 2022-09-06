@@ -207,7 +207,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
  
         beneficiaryAsset.amount = 0;
 
-        for (uint256 i = 0; i < payers.length; i++) {
+        for (uint256 i = 0; i < payers.length; ++i) {
             beneficiaryPayersArray[hashWithPassword][_assetType][adjustedAssetAddress].pop();
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress].assetIds[payers[i]];
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress];
@@ -285,7 +285,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         address [] storage payers = beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress];
 
-        for (uint256 i = 0; i < payers.length; i++) {
+        for (uint256 i = 0; i < payers.length; ++i) {
             if (msg.sender == payers[i]) {
                 delete beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][payers[i]];
                 if (_assetType == AssetType.NFT) {
@@ -317,7 +317,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         _checkNonZeroValue(_amount, "Nothing to transfer");
 
         if (_assetType == AssetType.NFT) {
-            for (uint256 i = 0; i < assetIds.length; i++) {
+            for (uint256 i = 0; i < assetIds.length; ++i) {
                 setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, assetIds[i]);
             }
         } else {
@@ -359,7 +359,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         require(_assetIds.length > 0, "Nothing to send");
 
         IERC721 nft = IERC721(_contractAddress);
-        for (uint256 i = 0; i < _assetIds.length; i++) {
+        for (uint256 i = 0; i < _assetIds.length; ++i) {
             nft.safeTransferFrom(_from, _to, _assetIds[i], "");
         }
     }
