@@ -1,16 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7; 
+
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+error Payments__OnlyContractOwnerCanAddAdmins();
+error Payments__OnlyContractOwnerCanDeleteAdmins();
+error Payments__OnlyContractOwnerCanAddSpecialDelegatePartner();
+error Payments__DelegateHandleExists();
+error Payments__Ownable_DelegateAddressIsTheZeroAddress();
+error Payments__OnlyDelegateCanDeleteDelegationLink();
+error Payments__AlreadyPaidThisReceipt();
+error Payments__OnlyContractOwnerCanChangeOwnershipOfContract();
+error Payments__Ownable_NewContractOwnerIsTheZeroAddress();
 
 contract payments {
 
     using SafeMath for uint256;
+    address public contractOwner = msg.sender; 
     mapping(string => uint256) percent;
     mapping(address => bool) private admins;
-    address public contractOwner = msg.sender; 
+    mapping(address => uint256) public balanceOf; 
     mapping(bytes32 => address) public receipts;
     mapping(bytes32 => uint256) public amounts;
-    mapping(address => uint256) public balanceOf; 
     mapping(string => address) public delegate;
 
     constructor() {
@@ -26,38 +37,38 @@ contract payments {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     function addAdmin(address adminAddress) external {
-        require(msg.sender == contractOwner, "Only contractOwner can add admins.");
+        if(msg.sender != contractOwner) { revert Payments__OnlyContractOwnerCanAddAdmins(); }
         admins[adminAddress] = true;
         emit AdminAdded(adminAddress);
     }
 
     function deleteAdmin(address adminAddress) external {
-        require(msg.sender == contractOwner, "Only contractOwner can delete admins.");
+        if(msg.sender != contractOwner) { revert Payments__OnlyContractOwnerCanDeleteAdmins(); }
         admins[adminAddress] = false;
         emit AdminDeleted(adminAddress);
     }
 
-    function addDelegateException(address delegateAddress, string memory delegateHandle, uint256 percentage) external {
-        require(msg.sender == contractOwner, "Only contractOwner can add special delegate partner.");
-        require(delegate[delegateHandle] == address(0), "Delegate handle exists.");
-        require(delegateAddress != address(0), "Ownable: delegateAddress is the zero address.");
+    function addDelegateException(address delegateAddress, string calldata delegateHandle, uint256 percentage) external {
+        if(msg.sender != contractOwner){revert Payments__OnlyContractOwnerCanAddSpecialDelegatePartner();}
+        if(delegate[delegateHandle] != address(0)){revert Payments__DelegateHandleExists();}
+        if(delegateAddress == address(0)){revert Payments__Ownable_DelegateAddressIsTheZeroAddress();}
         delegate[delegateHandle] = delegateAddress;
         percent[delegateHandle] = percentage;
         emit DelegateAdded(delegateHandle, delegateAddress);
     }
 
     // Anyone can create a delegate link for anyone
-    function addDelegate(address delegateAddress, string memory delegateHandle) external {
-        require(delegate[delegateHandle] == address(0), "Delegate handle exists.");
-        require(delegateAddress != address(0), "Ownable: delegateAddress is the zero address.");
+    function addDelegate(address delegateAddress, string calldata delegateHandle) external {
+        if(delegate[delegateHandle] != address(0)){revert Payments__DelegateHandleExists();}
+        if(delegateAddress == address(0)){revert Payments__Ownable_DelegateAddressIsTheZeroAddress();}
         delegate[delegateHandle] = delegateAddress;
         percent[delegateHandle] = 20;
         emit DelegateAdded(delegateHandle, delegateAddress);
     }
 
     // Delete the delegation link if needed.
-    function deleteDelegate(string memory delegateHandle) external {
-        require(msg.sender == delegate[delegateHandle], "Only delegate can delete delegation link.");
+    function deleteDelegate(string calldata delegateHandle) external {
+        if(msg.sender != delegate[delegateHandle]){revert Payments__OnlyDelegateCanDeleteDelegationLink();}
         address deletedDelegate = delegate[delegateHandle];
         delete delegate[delegateHandle];
         delete percent[delegateHandle];
@@ -65,8 +76,8 @@ contract payments {
     }
 
     // Payment function distributing the payment into two balances.
-    function payNative(bytes32 paymentId_hash, string memory IDrissHash, string memory delegateHandle) external payable {
-        require(receipts[paymentId_hash] == address(0), "Already paid this receipt.");
+    function payNative(bytes32 paymentId_hash, string calldata IDrissHash, string calldata delegateHandle) external payable {
+        if(receipts[paymentId_hash] != address(0)){revert Payments__AlreadyPaidThisReceipt();}
         receipts[paymentId_hash] = msg.sender;
         amounts[paymentId_hash] = msg.value;
         if (delegate[delegateHandle] != address(0)) {
@@ -79,7 +90,7 @@ contract payments {
     }
 
     // Anyone can withraw funds to any participating delegate
-    function withdraw(uint256 amount, string memory delegateHandle) external returns (bytes memory) {
+    function withdraw(uint256 amount, string calldata delegateHandle) external returns (bytes memory) {
         require(amount <= balanceOf[delegate[delegateHandle]]);
         balanceOf[delegate[delegateHandle]] -= amount;
         (bool sent, bytes memory data) = delegate[delegateHandle].call{value: amount, gas: 40000}("");
@@ -100,8 +111,8 @@ contract payments {
 
     // Transfer contract ownership
     function transferContractOwnership(address newOwner) public payable {
-        require(msg.sender == contractOwner, "Only contractOwner can change ownership of contract.");
-        require(newOwner != address(0), "Ownable: new contractOwner is the zero address.");
+        if(msg.sender != contractOwner){revert Payments__OnlyContractOwnerCanChangeOwnershipOfContract();}
+        if(newOwner == address(0)){revert Payments__Ownable_NewContractOwnerIsTheZeroAddress();}
         _transferOwnership(newOwner);
     }
 
