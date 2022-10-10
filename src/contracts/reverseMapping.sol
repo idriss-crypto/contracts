@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.1;
+pragma solidity 0.8.7;
 
 interface IDriss {
     function getIDriss(string memory hashPub) external view returns (string memory);
@@ -126,7 +126,7 @@ contract Test {
         bytes memory _string = new bytes(42);
         _string[0] = '0';
         _string[1] = 'x';
-        for(uint i = 0; i < 20; i++) {
+        for(uint i = 0; i < 20; ++i) {
             _string[2+i*2] = HEX[uint8(_bytes[i + 12] >> 4)];
             _string[3+i*2] = HEX[uint8(_bytes[i + 12] & 0x0f)];
         }
@@ -136,7 +136,7 @@ contract Test {
     function toLower(string memory str) internal pure returns (string memory) {
         bytes memory bStr = bytes(str);
         bytes memory bLower = new bytes(bStr.length);
-        for (uint i = 0; i < bStr.length; i++) {
+        for (uint i = 0; i < bStr.length; ++i) {
             // Uppercase character...
             if ((uint8(bStr[i]) >= 65) && (uint8(bStr[i]) <= 90)) {
                 // So we add 32 to make it lowercase
@@ -150,7 +150,7 @@ contract Test {
 
     function getSlice(string memory text) internal pure returns (string memory) {
         bytes memory a = new bytes(64);
-        for(uint i=0;i<=63;i++){
+        for(uint i=0;i<=63;++i){
             a[i] = bytes(text)[i+2];
         }
         return string(a);    
