@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
@@ -20,10 +21,10 @@ import { ConversionUtils } from "./libs/ConversionUtils.sol";
 
 /**
  * @title SendToHash
- * @author Rafał Kalinowski
+ * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
-contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165 {
+contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165, IERC1155Receiver {
     using SafeCast for int256;
 
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
@@ -52,6 +53,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address indexed assetContractAddress, uint256 amount, AssetType assetType);
     event AssetTransferReverted(bytes32 indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount, AssetType assetType);
+
+    error IDrissMappings__ERC1155_Batch_Transfers_Unsupported();
 
     constructor( address _IDrissAddr, address _maticUsdAggregator) {
         _checkNonZeroAddress(_IDrissAddr, "IDriss address cannot be 0");
@@ -515,9 +518,30 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
        return IERC721Receiver.onERC721Received.selector;
     }
 
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] memory,
+        uint256[] memory,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        revert IDrissMappings__ERC1155_Batch_Transfers_Unsupported();
+    }
+
     function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {
         return interfaceId == type(IERC165).interfaceId
          || interfaceId == type(IERC721Receiver).interfaceId
+         || interfaceId == type(IERC1155Receiver).interfaceId
          || interfaceId == type(ISendToHash).interfaceId;
     }
 }

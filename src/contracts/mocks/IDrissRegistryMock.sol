@@ -3,6 +3,7 @@ pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -16,6 +17,7 @@ contract MockToken is ERC20 {
         _mint(msg.sender,1000000000*10**18);
     }
 }
+
 /**
  * @title MockNFT
  * @author Rafał Kalinowski
@@ -27,6 +29,20 @@ contract MockNFT is ERC721, Ownable {
 
     function safeMint(address to, uint256 tokenId) public onlyOwner() {
         _safeMint(to, tokenId);
+    }
+}
+
+/**
+ * @title MockERC1155
+ * @author Rafał Kalinowski
+ * @notice mock ERC1155 token
+ * custom:experimental used only as a mock for tests
+ */
+contract MockERC1155 is ERC1155, Ownable {
+    constructor() ERC1155("http://example.xyz") { }
+
+    function mint(address to, uint256 tokenId, uint256 amount) public onlyOwner() {
+        _mint(to, tokenId, amount, "");
     }
 }
 
