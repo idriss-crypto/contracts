@@ -419,9 +419,7 @@ describe('SendToHash contract', async () => {
    it ('properly handles amounts in sendToAnyone() for single ERC1155 transfer', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
-      await mockERC1155.setApprovalForAll(sendToHash.address, true)
       await mockERC1155.safeTransferFrom(ownerAddress, signer1Address, 1, 1, "")
-      await mockERC1155.connect(signer1).setApprovalForAll(sendToHash.address, true)
       await mockERC1155.safeTransferFrom(ownerAddress, signer1Address, 3, 1, "")
       await mockERC1155.safeTransferFrom(ownerAddress, signer1Address, 4, 1, "")
 
@@ -1245,15 +1243,15 @@ describe('SendToHash contract', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       await mockERC1155.setApprovalForAll(sendToHash.address, true)
 
-      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_ERC1155, mockERC1155.address, 0, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 50, ASSET_TYPE_ERC1155, mockERC1155.address, 4, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
       await sendToHash.moveAssetToOtherHash(signer2Hash, signer3Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
       await sendToHash.moveAssetToOtherHash(signer3Hash, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
       await sendToHash.moveAssetToOtherHash(signer2Hash, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
 
-      expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(1)
-      expect(await mockERC1155.balanceOf(sendToHash.address, 0)).to.be.equal(1)
+      expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(50)
+      expect(await mockERC1155.balanceOf(sendToHash.address, 4)).to.be.equal(50)
    })
 
    it ('properly handles moving multiple NFTs in moveAssetToOtherHash()', async () => {
@@ -1274,13 +1272,14 @@ describe('SendToHash contract', async () => {
           .to.changeTokenBalances(mockNFT, [signer2, sendToHash], [3, -3])
    })
 
+   //TODO: change amounts to amount ids
    it ('properly handles moving multiple ERC1155s in moveAssetToOtherHash()', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
       await mockERC1155.setApprovalForAll(sendToHash.address, true)
 
-      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_ERC1155, mockERC1155.address, 0, "", {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_ERC1155, mockERC1155.address, 1, "", {value: dollarInWei})
-      await sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_ERC1155, mockERC1155.address, 2, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 0, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 1, "", {value: dollarInWei})
+      await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 2, "", {value: dollarInWei})
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
 
       expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(3)
@@ -1600,7 +1599,7 @@ describe('SendToHash contract', async () => {
       await mockERC1155.setApprovalForAll(sendToHash.address, true)
       await expect(sendToHash.sendToAnyone(signer1Hash, 2, ASSET_TYPE_ERC1155, mockERC1155.address, 1, "message from event!", {value: dollarInWei}))
           .to.emit(sendToHash, 'AssetTransferred')
-          .withArgs(signer1Hash, ownerAddress, mockERC1155.address, 1, ASSET_TYPE_ERC1155, "message from event!");
+          .withArgs(signer1Hash, ownerAddress, mockERC1155.address, 2, ASSET_TYPE_ERC1155, "message from event!");
 
       await expect(sendToHash.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_ERC1155, mockERC1155.address))
           .to.emit(sendToHash, 'AssetClaimed')
