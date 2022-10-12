@@ -43,10 +43,12 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       chainId: 1337,
+      allowUnlimitedContractSize: true,
     },
     ganache: {
       chainId: 1337, //event though config says it's 5777
       url: process.env.NETWORK_RPC_ENDPOINT ?? "http://127.0.0.1:7545",
+      allowUnlimitedContractSize: true,
       ...(accounts)
     },
     mumbai: {
@@ -62,6 +64,7 @@ const config: HardhatUserConfig = {
     hardhat_node: {
       chainId: 1337,
       url: "http://127.0.0.1:8545",
+      allowUnlimitedContractSize: true,
     }
   }
 }
