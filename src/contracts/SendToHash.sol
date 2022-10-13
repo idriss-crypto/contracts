@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import 'hardhat/console.sol';
 
 import { ISendToHash } from "./interfaces/ISendToHash.sol";
 import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
@@ -95,8 +96,11 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             assetIds[0] = _assetId;
             _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
-            uint256 [1] memory assetIds = [_assetId];
-            uint256 [1] memory assetAmounts = [paymentValue];
+            uint256 [] memory assetIds = new uint[](1);
+            assetIds[0] = _assetId;
+            console.log("ASSETID=%d", _assetId);
+            uint256 [] memory assetAmounts = new uint[](1);
+            assetAmounts[0] = paymentValue;
             _sendERC1155Asset(assetIds, assetAmounts, msg.sender, address(this), _assetContractAddress);
         }
 
@@ -119,7 +123,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability storage payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
-
 
         if (_assetType == AssetType.Coin) {
             _checkNonZeroValue(_amount, "Transferred value has to be bigger than 0");
@@ -146,6 +149,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
 
         if (_assetType == AssetType.ERC1155) {
+            //TODO: take care of case when the same asset is sent for second time
             AssetIdAmount memory asset = AssetIdAmount({id: _assetId, amount: _amount});
             beneficiaryAsset.assetIdAmounts[msg.sender].push(asset);
             payerAsset.assetIdAmounts[msg.sender].push(asset);
@@ -262,10 +266,26 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     function balanceOf (
         bytes32 _IDrissHash,
         AssetType _assetType,
-        address _assetContractAddress
+        address _assetContractAddress,
+        uint256 _assetId
     ) external override view returns (uint256) {
+        uint256 balance = 0;
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
-        return beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].amount;
+        AssetLiability storage asset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+
+        if (_assetType != AssetType.ERC1155) {
+            balance = asset.amount;
+        } else {
+            AssetIdAmount[] memory assetAmounts = asset.assetIdAmounts[_assetContractAddress];
+            // it's external view function, so arrays cost us nothing
+            for (uint256 i = 0; i < assetAmounts.length; ++i) {
+                if (assetAmounts[i].id == _assetId) {
+                    balance = assetAmounts[i].amount;
+                }
+            }
+        }
+
+        return balance;
     }
 
     /**
@@ -277,7 +297,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address _assetContractAddress
     ) external override nonReentrant() {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
-        uint256[] memory assetIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
         uint256 amountToRevert = setStateForRevertPayment(_IDrissHash, _assetType, _assetContractAddress);
 
         if (_assetType == AssetType.Coin) {
@@ -285,8 +304,20 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else if (_assetType == AssetType.Token) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
+            uint256[] memory assetIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
             _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
-        } 
+        } else if (_assetType == AssetType.ERC1155) {
+            AssetIdAmount[] memory assetAmountIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
+
+            uint256[] memory amounts = new uint256[](assetAmountIds.length);
+            uint256[] memory ids = new uint256[](assetAmountIds.length);
+            for (uint256 j = 0; j < assetAmountIds.length; ++j) {
+                ids[j] = assetAmountIds[j].id;
+                amounts[j] = assetAmountIds[j].amount;
+            }
+
+            _sendERC1155Asset(ids, amounts, address(this), msg.sender, _assetContractAddress);
+        }
 
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert, _assetType);
     }
@@ -379,6 +410,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
     /**
      * @notice Wrapper for sending ERC1155 asset with additional checks and iteraton over an array
+     * @dev due to how approval in ERC1155 standard is handled, the smart contract has to ask for permissions to manage
+     *      ALL tokens "for simplicity"... Hence, it has to be done before calling function that transfers the token
+     *      to smart contract, and revoked afterwards
      */
     function _sendERC1155Asset (
         uint256[] memory _assetIds,
@@ -566,7 +600,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         uint256,
         bytes memory
     ) public virtual override returns (bytes4) {
-        return this.onERC1155Received.selector;
+        return IERC1155Receiver.onERC1155Received.selector;
     }
 
     function onERC1155BatchReceived(
@@ -576,7 +610,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         uint256[] memory,
         bytes memory
     ) public virtual override returns (bytes4) {
-        revert IDrissMappings__ERC1155_Batch_Transfers_Unsupported();
+        return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 
     function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {
