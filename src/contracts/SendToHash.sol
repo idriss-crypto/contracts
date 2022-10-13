@@ -107,7 +107,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, paymentValue, _assetType, _message);
     }
 
-    //TODO: change _amount modification to memory variable
     /**
      * @notice Sets state for sendToAnyone function invocation
      */
@@ -137,10 +136,12 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
         }
 
-        if (_assetType == AssetType.NFT) { _amount = 1; }
+        uint256 paymentValue = _amount;
 
-        beneficiaryAsset.amount += _amount;
-        payerAsset.amount += _amount;
+        if (_assetType == AssetType.NFT) { paymentValue = 1; }
+
+        beneficiaryAsset.amount += paymentValue;
+        payerAsset.amount += paymentValue;
         paymentFeesBalance += _fee;
 
         if (_assetType == AssetType.NFT) {
@@ -149,8 +150,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         }
 
         if (_assetType == AssetType.ERC1155) {
-            //TODO: take care of case when the same asset is sent for second time
-            AssetIdAmount memory asset = AssetIdAmount({id: _assetId, amount: _amount});
+            AssetIdAmount memory asset = AssetIdAmount({id: _assetId, amount: paymentValue});
             beneficiaryAsset.assetIdAmounts[msg.sender].push(asset);
             payerAsset.assetIdAmounts[msg.sender].push(asset);
         }
@@ -272,15 +272,18 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         uint256 balance = 0;
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         AssetLiability storage asset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        address [] memory payers = beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress];
 
         if (_assetType != AssetType.ERC1155) {
             balance = asset.amount;
         } else {
-            AssetIdAmount[] memory assetAmounts = asset.assetIdAmounts[_assetContractAddress];
             // it's external view function, so arrays cost us nothing
-            for (uint256 i = 0; i < assetAmounts.length; ++i) {
-                if (assetAmounts[i].id == _assetId) {
-                    balance = assetAmounts[i].amount;
+            for (uint256 i = 0; i < payers.length; ++i) {
+                AssetIdAmount[] memory assetAmounts = asset.assetIdAmounts[payers[i]];
+                for (uint256 j = 0; j < assetAmounts.length; ++j) {
+                    if (assetAmounts[j].id == _assetId) {
+                        balance += assetAmounts[j].amount;
+                    }
                 }
             }
         }
