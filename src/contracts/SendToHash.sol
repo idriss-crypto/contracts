@@ -98,7 +98,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else if (_assetType == AssetType.ERC1155) {
             uint256 [] memory assetIds = new uint[](1);
             assetIds[0] = _assetId;
-            console.log("ASSETID=%d", _assetId);
             uint256 [] memory assetAmounts = new uint[](1);
             assetAmounts[0] = paymentValue;
             _sendERC1155Asset(assetIds, assetAmounts, msg.sender, address(this), _assetContractAddress);
@@ -300,6 +299,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address _assetContractAddress
     ) external override nonReentrant() {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
+        uint256[] memory assetIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
+        AssetIdAmount[] memory assetAmountIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
+
+        // has to be invoked after all reads required by this function, as it modifies state
         uint256 amountToRevert = setStateForRevertPayment(_IDrissHash, _assetType, _assetContractAddress);
 
         if (_assetType == AssetType.Coin) {
@@ -307,10 +310,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else if (_assetType == AssetType.Token) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            uint256[] memory assetIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
             _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
-            AssetIdAmount[] memory assetAmountIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
 
             uint256[] memory amounts = new uint256[](assetAmountIds.length);
             uint256[] memory ids = new uint256[](assetAmountIds.length);
@@ -376,13 +377,19 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     ) external override nonReentrant() {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256[] memory assetIds = beneficiaryAssetMap[_FromIDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
+        AssetIdAmount[] memory assetIdAmounts = beneficiaryAssetMap[_FromIDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
         uint256 _amount = setStateForRevertPayment(_FromIDrissHash, _assetType, _assetContractAddress);
 
         _checkNonZeroValue(_amount, "Nothing to transfer");
 
+        //TODO: check if moving assets from multiple contracts works properly
         if (_assetType == AssetType.NFT) {
             for (uint256 i = 0; i < assetIds.length; ++i) {
                 setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, assetIds[i]);
+            }
+        } else if (_assetType == AssetType.ERC1155) {
+            for (uint256 i = 0; i < assetIdAmounts.length; ++i) {
+                setStateForSendToAnyone(_ToIDrissHash, assetIdAmounts[i].amount, 0, _assetType, _assetContractAddress, assetIdAmounts[i].id);
             }
         } else {
             setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, 0);
