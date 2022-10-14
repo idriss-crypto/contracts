@@ -24,7 +24,8 @@ contract SendToHashReentrancyMock {
     function safeBatchTransferFrom (
         address,
         address,
-        uint256,
+        uint256[] memory,
+        uint256[] memory,
         bytes calldata
     ) external {
         _sendToAnyoneReentrancy(AssetType.ERC1155);

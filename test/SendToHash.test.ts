@@ -528,7 +528,6 @@ describe('SendToHash contract', async () => {
       expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_NFT, mockNFT.address, 0)).to.be.equal(3)
    })
 
-   // TODO: add ERC1155
    it ('properly handles assets for multiple asset transfers and reversals', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
@@ -1082,7 +1081,7 @@ describe('SendToHash contract', async () => {
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer3Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 0)).to.be.equal(0)
-      expect(await sendToHash.balanceOf(signer3Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 0)).to.be.equal(1)
+      expect(await sendToHash.balanceOf(signer3Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 1)).to.be.equal(1)
    })
 
    it ('allows user to claim native currency from new hash after moveAssetToOtherHash()', async () => {
@@ -1180,7 +1179,7 @@ describe('SendToHash contract', async () => {
       await sendToHash.moveAssetToOtherHash(signer2Hash, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
       await sendToHash.moveAssetToOtherHash(signer1Hash, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
 
-      expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 0)).to.be.equal(50)
+      expect(await sendToHash.balanceOf(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 4)).to.be.equal(50)
       expect(await mockERC1155.balanceOf(sendToHash.address, 4)).to.be.equal(50)
    })
 

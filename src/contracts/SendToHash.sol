@@ -163,7 +163,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      */
     function getPaymentFee(uint256 _value, AssetType _assetType) public view override returns (uint256) {
         uint256 minimumPaymentFee = _getMinimumFee();
-        if (_assetType == AssetType.Token || _assetType == AssetType.NFT) {
+        if (_assetType != AssetType.Coin) {
             return minimumPaymentFee;
         }
 
@@ -229,6 +229,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         for (uint256 i = 0; i < payers.length; ++i) {
             beneficiaryPayersArray[hashWithPassword][_assetType][adjustedAssetAddress].pop();
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress].assetIds[payers[i]];
+            delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress].assetIdAmounts[payers[i]];
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress];
             delete beneficiaryPayersMap[hashWithPassword][_assetType][adjustedAssetAddress][payers[i]];
             if (_assetType == AssetType.NFT) {
@@ -243,7 +244,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
                     ids[j] = assetAmountIds[j].id;
                     amounts[j] = assetAmountIds[j].amount;
                 }
-                delete beneficiaryAsset.assetIds[payers[i]];
+                delete beneficiaryAsset.assetIdAmounts[payers[i]];
                 _sendERC1155Asset(ids, amounts, address(this), ownerIDrissAddr, _assetContractAddress);
             }
         }
@@ -312,7 +313,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
-
             uint256[] memory amounts = new uint256[](assetAmountIds.length);
             uint256[] memory ids = new uint256[](assetAmountIds.length);
             for (uint256 j = 0; j < assetAmountIds.length; ++j) {
@@ -341,6 +341,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
 
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
+        delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
         beneficiaryAsset.amount -= amountToRevert;
 
