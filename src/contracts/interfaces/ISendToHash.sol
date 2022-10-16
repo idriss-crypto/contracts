@@ -36,7 +36,8 @@ interface ISendToHash {
     function balanceOf (
         bytes32 _IDrissHash,
         AssetType _assetType,
-        address _assetContractAddress
+        address _assetContractAddress,
+        uint256 _assetId
     ) external view returns (uint256);
 
     function hashIDrissWithPassword (

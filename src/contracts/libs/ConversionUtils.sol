@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7;
 
-//TODO: add documentation
 library ConversionUtils {
     /**
     * @notice Change a single character from ASCII to 0-F hex value; revert on unparseable value

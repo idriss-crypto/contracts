@@ -3,9 +3,10 @@ import { BigNumber, Signer } from 'ethers'
 import chai, { expect } from 'chai'
 import IDrissArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/IDriss.json'
 import MaticPriceAggregatorV3MockArtifact from '../src/artifacts/src/contracts/mocks/MaticPriceAggregatorV3Mock.sol/MaticPriceAggregatorV3Mock.json'
+import MockERC1155Artifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockERC1155.json'
 import MockNFTArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockNFT.json'
 import MockTokenArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockToken.json'
-import { MockToken, SendToHashMock, SendToHashMockData, SendToHashUtilsMock, MockNFT, MaticPriceAggregatorV3Mock, IDriss } from '../src/types'
+import { MockToken, SendToHashMock, SendToHashMockData, SendToHashUtilsMock, MockNFT, MaticPriceAggregatorV3Mock, IDriss, MockERC1155 } from '../src/types'
 import SendToHashArtifact from '../src/artifacts/src/contracts/mocks/SendToHashMock.sol/SendToHashMock.json'
 import SendToHashDataArtifact from '../src/artifacts/src/contracts/mocks/SendToHashMockData.sol/SendToHashMockData.json'
 import SendToHashUtilsArtifact from '../src/artifacts/src/contracts/mocks/SendToHashUtilsMock.sol/SendToHashUtilsMock.json'
@@ -18,8 +19,17 @@ chai.use(chaiAsPromised) //eventually
 const ASSET_TYPE_COIN = 0
 const ASSET_TYPE_TOKEN = 1
 const ASSET_TYPE_NFT = 2
+const ASSET_TYPE_ERC1155 = 3
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const NFT_ID_ARRAY = [... Array(10).keys()]
+const ERC1155_ARRAY = [
+   [0, 1],
+   [1, 1],
+   [2, 1],
+   [3, 160],
+   [4, 1_000_000],
+   [5, 996]
+]
 
 describe('SendToHashMock contract', async () => {
    let owner: Signer;
@@ -43,6 +53,8 @@ describe('SendToHashMock contract', async () => {
    let mockToken2: MockToken
    let mockNFT: MockNFT
    let mockNFT2: MockNFT
+   let mockERC1155: MockERC1155
+   let mockERC1155_2: MockERC1155
    let sendToHashMock: SendToHashMock
    let sendToHashMockData: SendToHashMockData
    let sendToHashUtilsMock: SendToHashUtilsMock
@@ -65,6 +77,8 @@ describe('SendToHashMock contract', async () => {
       mockToken2 = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
       mockNFT = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
       mockNFT2 = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
+      mockERC1155 = (await waffle.deployContract(owner, MockERC1155Artifact, [])) as MockERC1155
+      mockERC1155_2 = (await waffle.deployContract(owner, MockERC1155Artifact, [])) as MockERC1155
       mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
       idriss = (await waffle.deployContract(owner, IDrissArtifact, [])) as IDriss
       sendToHashMock = (await waffle.deployContract(owner, SendToHashArtifact,
@@ -87,6 +101,13 @@ describe('SendToHashMock contract', async () => {
             await mockNFT.safeMint(ownerAddress, val).catch(_ => {})
             return mockNFT2.safeMint(ownerAddress, val).catch(_ => {})
          })
+      )
+
+      await Promise.all(
+          ERC1155_ARRAY.map( async (val, idx, _) => {
+             await mockERC1155.mint(ownerAddress, val[0],  val[1]).catch(_ => {})
+             return mockERC1155_2.mint(ownerAddress, val[0],  val[1]).catch(_ => {})
+          })
       )
    })
 
@@ -132,14 +153,16 @@ describe('SendToHashMock contract', async () => {
       expect(value6).to.be.equal(dollarInWei.mul(1188))
    })
 
-   it ('properly calculates fee for ERC20 & ERC721', async () => {
+   it ('properly calculates fee for non native token', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
       const paymentFeeToken = await sendToHashMock.getPaymentFee(dollarInWei.mul(1000), ASSET_TYPE_TOKEN)
       const paymentFeeNFT = await sendToHashMock.getPaymentFee(dollarInWei.mul(564), ASSET_TYPE_NFT)
+      const paymentFeeERC1155 = await sendToHashMock.getPaymentFee(dollarInWei.mul(564), ASSET_TYPE_ERC1155)
 
       expect(paymentFeeToken).to.be.equal(dollarInWei)
       expect(paymentFeeNFT).to.be.equal(dollarInWei)
+      expect(paymentFeeERC1155).to.be.equal(dollarInWei)
    })
 
    it ('properly calculates fee for native currency', async () => {
@@ -427,6 +450,93 @@ describe('SendToHashMock contract', async () => {
          .to.be.equal(true)
    })
 
+   it ('properly handles internal mappings when invoking valid sendToAnyone() for ERC1155', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 0, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 1, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 2, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 4, 100, "0x")
+      await mockERC1155.setApprovalForAll(sendToHashMockData.address, true)
+      await mockERC1155.connect(signer2).setApprovalForAll(sendToHashMockData.address, true)
+
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 0, "", {value: dollarInWei})
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 1, "", {value: dollarInWei})
+
+      expect(await sendToHashMockData.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.have.members([signer2Address])
+      expect(await sendToHashMockData.getBeneficiaryPayersArray(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.have.members([signer2Address])
+
+
+      expect(await sendToHashMockData.getPayerAssetMapAmount(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(1)
+
+      const payerAmounts1 = await sendToHashMockData.getPayerAssetMapAssetIdAmounts(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
+      expect(payerAmounts1.length).to.be.equal(1)
+      expect(payerAmounts1[0]['id'].toString()).to.be.equal('0')
+      expect(payerAmounts1[0]['amount'].toString()).to.be.equal('1')
+
+      expect(await sendToHashMockData.getBeneficiaryMapAmount(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(1)
+      const benefAmounts1 = await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, signer2Address)
+      expect(benefAmounts1.length).to.be.equal(1)
+      expect(benefAmounts1[0]['id'].toString()).to.be.equal('0')
+      expect(benefAmounts1[0]['amount'].toString()).to.be.equal('1')
+
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, ownerAddress)).length)
+          .to.be.equal(0)
+
+      await sendToHashMockData.sendToAnyone(signer1Hash, 6, ASSET_TYPE_ERC1155, mockERC1155.address, 3, "", {value: dollarInWei})
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer1Hash, 15, ASSET_TYPE_ERC1155, mockERC1155.address, 4, "", {value: dollarInWei})
+
+      expect(await sendToHashMockData.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.have.members([signer2Address, ownerAddress])
+
+      expect(await sendToHashMockData.getPayerAssetMapAmount(ownerAddress, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(6)
+      expect(await sendToHashMockData.getPayerAssetMapAmount(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(16)
+      const payerAmounts2 = await sendToHashMockData.getPayerAssetMapAssetIdAmounts(ownerAddress, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
+      expect(payerAmounts2.length).to.be.equal(1)
+      expect(payerAmounts2[0]['id'].toString()).to.be.equal('3')
+      expect(payerAmounts2[0]['amount'].toString()).to.be.equal('6')
+
+      expect(await sendToHashMockData.getBeneficiaryMapAmount(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(22)
+
+      const benefAmounts2 = await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, signer2Address)
+      expect(benefAmounts2.length).to.be.equal(2)
+      expect(benefAmounts2[0]['id'].toString()).to.be.equal('0')
+      expect(benefAmounts2[0]['amount'].toString()).to.be.equal('1')
+      expect(benefAmounts2[1]['id'].toString()).to.be.equal('4')
+      expect(benefAmounts2[1]['amount'].toString()).to.be.equal('15')
+
+      const benefAmounts3 = await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, ownerAddress)
+      expect(benefAmounts3.length).to.be.equal(1)
+      expect(benefAmounts3[0]['id'].toString()).to.be.equal('3')
+      expect(benefAmounts3[0]['amount'].toString()).to.be.equal('6')
+
+      expect(await sendToHashMockData.getPayerAssetMapAmount(signer2Address, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(1)
+
+      const payerAmounts3 = await sendToHashMockData.getPayerAssetMapAssetIdAmounts(signer2Address, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
+      expect(payerAmounts3.length).to.be.equal(1)
+      expect(payerAmounts3[0]['id'].toString()).to.be.equal('1')
+      expect(payerAmounts3[0]['amount'].toString()).to.be.equal('1')
+
+      expect(await sendToHashMockData.getBeneficiaryMapAmount(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(1)
+
+      const benefAmounts4 = await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address, signer2Address)
+      expect(benefAmounts4.length).to.be.equal(1)
+      expect(benefAmounts4[0]['id'].toString()).to.be.equal('1')
+      expect(benefAmounts4[0]['amount'].toString()).to.be.equal('1')
+
+      const benefAmounts5 = await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address, ownerAddress)
+      expect(benefAmounts5.length).to.be.equal(0)
+
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(ownerAddress, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(true)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer1Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(true)
+   })
+
    it ('properly handles internal mappings when invoking valid revert() for coin', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
@@ -647,6 +757,79 @@ describe('SendToHashMock contract', async () => {
          .to.be.equal(true)
    })
 
+   it ('properly handles internal mappings when invoking valid revert() for ERC1155', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 0, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 1, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 3, 50, "0x")
+      await mockERC1155.setApprovalForAll(sendToHashMockData.address, true)
+      await mockERC1155.connect(signer2).setApprovalForAll(sendToHashMockData.address, true)
+
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 0, "", {value: dollarInWei})
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 1, "", {value: dollarInWei})
+      await sendToHashMockData.sendToAnyone(signer1Hash, 10, ASSET_TYPE_ERC1155, mockERC1155.address, 3, "", {value: dollarInWei})
+      await sendToHashMockData.sendToAnyone(signer1Hash, 5, ASSET_TYPE_ERC1155, mockERC1155.address, 4, "", {value: dollarInWei})
+      await sendToHashMockData.sendToAnyone(signer1Hash, 97, ASSET_TYPE_ERC1155, mockERC1155.address, 5, "", {value: dollarInWei})
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer1Hash, 20, ASSET_TYPE_ERC1155, mockERC1155.address, 3, "", {value: dollarInWei})
+
+      await sendToHashMockData.connect(signer2).revertPayment(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
+
+      expect(await sendToHashMockData.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.have.members([ownerAddress])
+      expect(await sendToHashMockData.getBeneficiaryPayersArray(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.have.members([signer2Address])
+      expect(await sendToHashMockData.getPayerAssetMapAmount(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(0)
+      expect((await sendToHashMockData.getPayerAssetMapAssetIds(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect(await sendToHashMockData.getBeneficiaryMapAmount(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(112)
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, signer2Address)).length)
+          .to.be.equal(0)
+
+      const benef1 = await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, ownerAddress)
+      expect(benef1.length).to.be.equal(3)
+      expect(benef1[0]['id'].toString()).to.be.equal('3')
+      expect(benef1[0]['amount'].toString()).to.be.equal('10')
+      expect(benef1[1]['id'].toString()).to.be.equal('4')
+      expect(benef1[1]['amount'].toString()).to.be.equal('5')
+      expect(benef1[2]['id'].toString()).to.be.equal('5')
+      expect(benef1[2]['amount'].toString()).to.be.equal('97')
+
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(ownerAddress, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(true)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer1Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(true)
+
+      await sendToHashMockData.revertPayment(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)
+
+      expect((await sendToHashMockData.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect(await sendToHashMockData.getBeneficiaryPayersArray(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.have.members([signer2Address])
+      expect(await sendToHashMockData.getPayerAssetMapAmount(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(0)
+      expect((await sendToHashMockData.getPayerAssetMapAssetIds(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect(await sendToHashMockData.getBeneficiaryMapAmount(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(0)
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, signer2Address)).length)
+          .to.be.equal(0)
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, ownerAddress)).length)
+          .to.be.equal(0)
+
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(ownerAddress, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer1Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(true)
+   })
+
    it ('properly handles internal mappings when invoking valid claim() for coin', async () => {
       const dollarInWei = await mockPriceOracle.dollarToWei()
 
@@ -841,5 +1024,73 @@ describe('SendToHashMock contract', async () => {
          .to.be.equal(false)
       expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer2Hash, ASSET_TYPE_NFT, mockNFT.address))
          .to.be.equal(false)
+   })
+
+   it ('properly handles internal mappings when invoking valid claim() for ERC1155', async () => {
+      const dollarInWei = await mockPriceOracle.dollarToWei()
+      await mockERC1155.setApprovalForAll(sendToHashMockData.address, true)
+      await mockERC1155.connect(signer2).setApprovalForAll(sendToHashMockData.address, true)
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 0, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 1, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 2, 1, "0x")
+      await mockERC1155.safeTransferFrom(ownerAddress, signer2Address, 3, 50, "0x")
+
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 0, "", {value: dollarInWei})
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer2Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 1, "", {value: dollarInWei})
+      await sendToHashMockData.sendToAnyone(signer1Hash, 35, ASSET_TYPE_ERC1155, mockERC1155.address, 3, "", {value: dollarInWei})
+      await sendToHashMockData.sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 4, "", {value: dollarInWei})
+      await sendToHashMockData.sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 5, "", {value: dollarInWei})
+      await sendToHashMockData.connect(signer2).sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 2, "", {value: dollarInWei})
+
+      await sendToHashMockData.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_ERC1155, mockERC1155.address)
+
+      expect((await sendToHashMockData.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect(await sendToHashMockData.getBeneficiaryPayersArray(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.have.members([signer2Address])
+      expect(await sendToHashMockData.getPayerAssetMapAmount(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(0)
+
+      expect((await sendToHashMockData.getPayerAssetMapAssetIdAmounts(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect(await sendToHashMockData.getBeneficiaryMapAmount(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(0)
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, signer2Address)).length)
+          .to.be.equal(0)
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, ownerAddress)).length)
+          .to.be.equal(0)
+
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(ownerAddress, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer1Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(true)
+
+      await sendToHashMockData.connect(signer2).claim(signer2HashForClaim, signer2ClaimPassword, ASSET_TYPE_ERC1155, mockERC1155.address)
+
+      expect((await sendToHashMockData.getBeneficiaryPayersArray(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect((await sendToHashMockData.getBeneficiaryPayersArray(signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect(await sendToHashMockData.getPayerAssetMapAmount(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(0)
+      expect((await sendToHashMockData.getPayerAssetMapAssetIdAmounts(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).length)
+          .to.be.equal(0)
+      expect(await sendToHashMockData.getBeneficiaryMapAmount(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address)).to.be.equal(0)
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, signer2Address)).length)
+          .to.be.equal(0)
+      expect((await sendToHashMockData.getBeneficiaryMapAssetIdAmounts(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, ownerAddress)).length)
+          .to.be.equal(0)
+
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(ownerAddress, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer1Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
+      expect(await sendToHashMockData.getBeneficiaryPayersMap(signer2Address, signer2Hash, ASSET_TYPE_ERC1155, mockERC1155.address))
+          .to.be.equal(false)
    })
 })

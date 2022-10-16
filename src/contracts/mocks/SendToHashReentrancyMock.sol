@@ -20,7 +20,18 @@ contract SendToHashReentrancyMock {
         hashToPerformAttackOn = _hash;
     }
 
-    //ERC721
+    //ERC721 - overrides ERC1155 function
+    function safeBatchTransferFrom (
+        address,
+        address,
+        uint256[] memory,
+        uint256[] memory,
+        bytes calldata
+    ) external {
+        _sendToAnyoneReentrancy(AssetType.ERC1155);
+    }
+
+    //ERC721 - overrides ERC721 function
     function safeTransferFrom (
         address,
         address,
@@ -30,14 +41,14 @@ contract SendToHashReentrancyMock {
         _sendToAnyoneReentrancy(AssetType.NFT);
     }
 
-    //ERC20
+    //ERC20 - overrides ERC20 function
     function transfer(address, uint256) external returns (bool) {
         _sendToAnyoneReentrancy(AssetType.Token);
 
         return true;
     }
 
-    //ERC20
+    //ERC20 - overrides ERC20 function
     function transferFrom(
         address,
         address,

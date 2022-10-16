@@ -4,9 +4,10 @@ pragma solidity 0.8.7;
 import { ISendToHash } from "../interfaces/ISendToHash.sol";
 import { SendToHash } from "../SendToHash.sol"; 
 import { IIDrissRegistry } from "../interfaces/IIDrissRegistry.sol";
-import { AssetLiability } from "../structs/IDrissStructs.sol";
+import { AssetLiability, AssetIdAmount } from "../structs/IDrissStructs.sol";
 import { AssetType } from "../enums/IDrissEnums.sol";
 import { ConversionUtils } from "../libs/ConversionUtils.sol";
+import "../structs/IDrissStructs.sol";
 
 /**
  * @title SendToHashMock
@@ -36,6 +37,14 @@ contract SendToHashMockData is SendToHash {
             return payerAssetMap[_payerAddress][_IDrissHash][_assetType][_assetContractAddress].assetIds[_payerAddress];
     }
 
+    function getPayerAssetMapAssetIdAmounts(
+        address _payerAddress,
+        bytes32 _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress) external view returns (AssetIdAmount[] memory) {
+        return payerAssetMap[_payerAddress][_IDrissHash][_assetType][_assetContractAddress].assetIdAmounts[_payerAddress];
+    }
+
     function getBeneficiaryMapAmount(
         bytes32 _IDrissHash,
         AssetType _assetType,
@@ -49,6 +58,14 @@ contract SendToHashMockData is SendToHash {
         address _assetContractAddress,
         address _payerAddress) external view returns (uint256[] memory) {
             return beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress].assetIds[_payerAddress];
+    }
+
+    function getBeneficiaryMapAssetIdAmounts(
+        bytes32 _IDrissHash,
+        AssetType _assetType,
+        address _assetContractAddress,
+        address _payerAddress) external view returns (AssetIdAmount[] memory) {
+        return beneficiaryAssetMap[_IDrissHash][_assetType][_assetContractAddress].assetIdAmounts[_payerAddress];
     }
 
     function getBeneficiaryPayersArray(

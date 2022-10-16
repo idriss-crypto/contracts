@@ -8,22 +8,25 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import 'hardhat/console.sol';
 
 import { ISendToHash } from "./interfaces/ISendToHash.sol";
 import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
-import { AssetLiability } from "./structs/IDrissStructs.sol";
+import { AssetLiability, AssetIdAmount } from "./structs/IDrissStructs.sol";
 import { AssetType } from "./enums/IDrissEnums.sol";
 import { ConversionUtils } from "./libs/ConversionUtils.sol";
 
 
 /**
  * @title SendToHash
- * @author Rafał Kalinowski
+ * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
-contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165 {
+contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165, IERC1155Receiver {
     using SafeCast for int256;
 
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
@@ -53,9 +56,11 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     event AssetTransferReverted(bytes32 indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount, AssetType assetType);
 
+    error IDrissMappings__ERC1155_Batch_Transfers_Unsupported();
+
     constructor( address _IDrissAddr, address _maticUsdAggregator) {
         _checkNonZeroAddress(_IDrissAddr, "IDriss address cannot be 0");
-        _checkNonZeroAddress(_IDrissAddr, "Matic price feed address cannot be 0");
+        _checkNonZeroAddress(_maticUsdAggregator, "Matic price feed address cannot be 0");
 
         IDRISS_ADDR = _IDrissAddr;
         MATIC_USD_PRICE_FEED = AggregatorV3Interface(_maticUsdAggregator);
@@ -79,7 +84,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value);
         if (_assetType != AssetType.Coin) { fee = msg.value; }
-        if (_assetType == AssetType.Token) { paymentValue = _amount; }
+        if (_assetType == AssetType.Token || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
         if (_assetType == AssetType.NFT) { paymentValue = 1; }
 
         setStateForSendToAnyone(_IDrissHash, paymentValue, fee, _assetType, _assetContractAddress, _assetId);
@@ -90,6 +95,12 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             uint256 [] memory assetIds = new uint[](1);
             assetIds[0] = _assetId;
             _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
+        } else if (_assetType == AssetType.ERC1155) {
+            uint256 [] memory assetIds = new uint[](1);
+            assetIds[0] = _assetId;
+            uint256 [] memory assetAmounts = new uint[](1);
+            assetAmounts[0] = paymentValue;
+            _sendERC1155Asset(assetIds, assetAmounts, msg.sender, address(this), _assetContractAddress);
         }
 
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, paymentValue, _assetType, _message);
@@ -111,7 +122,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability storage payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
 
-
         if (_assetType == AssetType.Coin) {
             _checkNonZeroValue(_amount, "Transferred value has to be bigger than 0");
         } else {
@@ -125,14 +135,23 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][msg.sender] = true;
         }
 
-        if (_assetType == AssetType.NFT) { _amount = 1; }
-        beneficiaryAsset.amount += _amount;
-        payerAsset.amount += _amount;
+        uint256 paymentValue = _amount;
+
+        if (_assetType == AssetType.NFT) { paymentValue = 1; }
+
+        beneficiaryAsset.amount += paymentValue;
+        payerAsset.amount += paymentValue;
         paymentFeesBalance += _fee;
 
         if (_assetType == AssetType.NFT) {
             beneficiaryAsset.assetIds[msg.sender].push(_assetId);
             payerAsset.assetIds[msg.sender].push(_assetId);
+        }
+
+        if (_assetType == AssetType.ERC1155) {
+            AssetIdAmount memory asset = AssetIdAmount({id: _assetId, amount: paymentValue});
+            beneficiaryAsset.assetIdAmounts[msg.sender].push(asset);
+            payerAsset.assetIdAmounts[msg.sender].push(asset);
         }
     }
 
@@ -144,7 +163,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
      */
     function getPaymentFee(uint256 _value, AssetType _assetType) public view override returns (uint256) {
         uint256 minimumPaymentFee = _getMinimumFee();
-        if (_assetType == AssetType.Token || _assetType == AssetType.NFT) {
+        if (_assetType != AssetType.Coin) {
             return minimumPaymentFee;
         }
 
@@ -210,12 +229,23 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         for (uint256 i = 0; i < payers.length; ++i) {
             beneficiaryPayersArray[hashWithPassword][_assetType][adjustedAssetAddress].pop();
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress].assetIds[payers[i]];
+            delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress].assetIdAmounts[payers[i]];
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress];
             delete beneficiaryPayersMap[hashWithPassword][_assetType][adjustedAssetAddress][payers[i]];
             if (_assetType == AssetType.NFT) {
                 uint256[] memory assetIds = beneficiaryAsset.assetIds[payers[i]];
                 delete beneficiaryAsset.assetIds[payers[i]];
                 _sendNFTAsset(assetIds, address(this), ownerIDrissAddr, _assetContractAddress);
+            } else if (_assetType == AssetType.ERC1155) {
+                AssetIdAmount[] memory assetAmountIds = beneficiaryAsset.assetIdAmounts[payers[i]];
+                uint256[] memory amounts = new uint256[](assetAmountIds.length);
+                uint256[] memory ids = new uint256[](assetAmountIds.length);
+                for (uint256 j = 0; j < assetAmountIds.length; ++j) {
+                    ids[j] = assetAmountIds[j].id;
+                    amounts[j] = assetAmountIds[j].amount;
+                }
+                delete beneficiaryAsset.assetIdAmounts[payers[i]];
+                _sendERC1155Asset(ids, amounts, address(this), ownerIDrissAddr, _assetContractAddress);
             }
         }
 
@@ -236,10 +266,29 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     function balanceOf (
         bytes32 _IDrissHash,
         AssetType _assetType,
-        address _assetContractAddress
+        address _assetContractAddress,
+        uint256 _assetId
     ) external override view returns (uint256) {
+        uint256 balance = 0;
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
-        return beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].amount;
+        AssetLiability storage asset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
+        address [] memory payers = beneficiaryPayersArray[_IDrissHash][_assetType][adjustedAssetAddress];
+
+        if (_assetType != AssetType.ERC1155) {
+            balance = asset.amount;
+        } else {
+            // it's external view function, so arrays cost us nothing
+            for (uint256 i = 0; i < payers.length; ++i) {
+                AssetIdAmount[] memory assetAmounts = asset.assetIdAmounts[payers[i]];
+                for (uint256 j = 0; j < assetAmounts.length; ++j) {
+                    if (assetAmounts[j].id == _assetId) {
+                        balance += assetAmounts[j].amount;
+                    }
+                }
+            }
+        }
+
+        return balance;
     }
 
     /**
@@ -252,6 +301,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     ) external override nonReentrant() {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256[] memory assetIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
+        AssetIdAmount[] memory assetAmountIds = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
+
+        // has to be invoked after all reads required by this function, as it modifies state
         uint256 amountToRevert = setStateForRevertPayment(_IDrissHash, _assetType, _assetContractAddress);
 
         if (_assetType == AssetType.Coin) {
@@ -260,7 +312,16 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
-        } 
+        } else if (_assetType == AssetType.ERC1155) {
+            uint256[] memory amounts = new uint256[](assetAmountIds.length);
+            uint256[] memory ids = new uint256[](assetAmountIds.length);
+            for (uint256 j = 0; j < assetAmountIds.length; ++j) {
+                ids[j] = assetAmountIds[j].id;
+                amounts[j] = assetAmountIds[j].amount;
+            }
+
+            _sendERC1155Asset(ids, amounts, address(this), msg.sender, _assetContractAddress);
+        }
 
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert, _assetType);
     }
@@ -280,6 +341,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         _checkNonZeroValue(amountToRevert, "Nothing to revert.");
 
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
+        delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
         delete payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
         beneficiaryAsset.amount -= amountToRevert;
 
@@ -290,6 +352,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
                 delete beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][payers[i]];
                 if (_assetType == AssetType.NFT) {
                     delete beneficiaryAsset.assetIds[payers[i]];
+                } else if (_assetType == AssetType.ERC1155) {
+                    delete beneficiaryAsset.assetIdAmounts[payers[i]];
                 }
                 payers[i] = payers[payers.length - 1];
                 payers.pop();
@@ -298,6 +362,8 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         if (_assetType == AssetType.NFT) {
             delete beneficiaryAsset.assetIds[msg.sender];
+        } else if (_assetType == AssetType.ERC1155) {
+            delete beneficiaryAsset.assetIdAmounts[msg.sender];
         }
 }
 
@@ -312,6 +378,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     ) external override nonReentrant() {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256[] memory assetIds = beneficiaryAssetMap[_FromIDrissHash][_assetType][adjustedAssetAddress].assetIds[msg.sender];
+        AssetIdAmount[] memory assetIdAmounts = beneficiaryAssetMap[_FromIDrissHash][_assetType][adjustedAssetAddress].assetIdAmounts[msg.sender];
         uint256 _amount = setStateForRevertPayment(_FromIDrissHash, _assetType, _assetContractAddress);
 
         _checkNonZeroValue(_amount, "Nothing to transfer");
@@ -319,6 +386,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         if (_assetType == AssetType.NFT) {
             for (uint256 i = 0; i < assetIds.length; ++i) {
                 setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, assetIds[i]);
+            }
+        } else if (_assetType == AssetType.ERC1155) {
+            for (uint256 i = 0; i < assetIdAmounts.length; ++i) {
+                setStateForSendToAnyone(_ToIDrissHash, assetIdAmounts[i].amount, 0, _assetType, _assetContractAddress, assetIdAmounts[i].id);
             }
         } else {
             setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, 0);
@@ -345,6 +416,23 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
         require(sent, "Failed to withdraw");
+    }
+
+    /**
+     * @notice Wrapper for sending ERC1155 asset with additional checks and iteraton over an array
+     * @dev due to how approval in ERC1155 standard is handled, the smart contract has to ask for permissions to manage
+     *      ALL tokens "for simplicity"... Hence, it has to be done before calling function that transfers the token
+     *      to smart contract, and revoked afterwards
+     */
+    function _sendERC1155Asset (
+        uint256[] memory _assetIds,
+        uint256[] memory _amounts,
+        address _from,
+        address _to,
+        address _contractAddress
+    ) internal {
+        IERC1155 nft = IERC1155(_contractAddress);
+        nft.safeBatchTransferFrom(_from, _to, _assetIds, _amounts, "");
     }
 
     /**
@@ -515,9 +603,30 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
        return IERC721Receiver.onERC721Received.selector;
     }
 
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return IERC1155Receiver.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] memory,
+        uint256[] memory,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return IERC1155Receiver.onERC1155BatchReceived.selector;
+    }
+
     function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {
         return interfaceId == type(IERC165).interfaceId
          || interfaceId == type(IERC721Receiver).interfaceId
+         || interfaceId == type(IERC1155Receiver).interfaceId
          || interfaceId == type(ISendToHash).interfaceId;
     }
 }
