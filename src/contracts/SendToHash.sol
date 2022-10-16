@@ -383,7 +383,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
         _checkNonZeroValue(_amount, "Nothing to transfer");
 
-        //TODO: check if moving assets from multiple contracts works properly
         if (_assetType == AssetType.NFT) {
             for (uint256 i = 0; i < assetIds.length; ++i) {
                 setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, assetIds[i]);
