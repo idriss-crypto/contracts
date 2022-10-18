@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
+pragma solidity 0.8.17;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+
+import "./interfaces/ITipping.sol";
 
 error tipping__withdraw__OnlyAdminCanWithdraw();
-error tipping__withdrawToken__OnlyAdminCanWithdrawToken();
 error tipping__addAdmin__OnlyContractOwnerCanAddAdmins();
 error tipping__deleteAdmin__OnlyContractOwnerCanDeleteAdmins();
-error tipping__transferContractOwnership__OnlyContractOwnerCanChangeOwnership();
 
 
-contract Tipping {
+contract Tipping is Ownable, ITipping, IERC165 {
     using SafeMath for uint256;
     address public contractOwner;
     mapping(address => uint256) public balanceOf;
@@ -26,12 +32,8 @@ contract Tipping {
         address sender,
         address tokenAddress
     );
-    event OwnershipTransferred(
-        address indexed previousOwner,
-        address indexed newOwner
-    );
 
-    function sendTo(address _recipient, string memory _message) public payable {
+    function sendTo(address _recipient, string memory _message) external payable override {
         (bool success, ) = _recipient.call{
             value: msg.value.sub(msg.value.div(100))
         }("");
@@ -44,7 +46,7 @@ contract Tipping {
         uint256 _amount,
         address _tokenContractAddr,
         string memory _message
-    ) public payable {
+    ) external payable override {
         IERC20 paymentTc = IERC20(_tokenContractAddr);
         require(
             paymentTc.allowance(msg.sender, address(this)) >= _amount,
@@ -64,7 +66,7 @@ contract Tipping {
         emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr);
     }
 
-    function withdraw() external OnlyAdminCanWithdraw {
+    function withdraw() external override OnlyAdminCanWithdraw {
         (bool success, ) = msg.sender.call{value: address(this).balance}("");
         require(success, "Failed to withdraw.");
     }
@@ -78,22 +80,17 @@ contract Tipping {
 
     function withdrawToken(address _tokenContract)
         external
-        OnlyAdminCanWithdrawToken
+        override
+        OnlyAdminCanWithdraw
     {
         IERC20 withdrawTC = IERC20(_tokenContract);
         withdrawTC.transfer(msg.sender, withdrawTC.balanceOf(address(this)));
     }
 
-    modifier OnlyAdminCanWithdrawToken() {
-        if (admins[msg.sender] != true) {
-            revert tipping__withdrawToken__OnlyAdminCanWithdrawToken();
-        }
-        _;
-    }
-
     function addAdmin(address _adminAddress)
         external
-        OnlyContractOwnerCanAddAdmins
+        override
+        onlyOwner
     {
         admins[_adminAddress] = true;
     }
@@ -107,41 +104,22 @@ contract Tipping {
 
     function deleteAdmin(address _adminAddress)
         external
-        OnlyContractOwnerCanDeleteAdmins
+        override
+        onlyOwner
     {
         admins[_adminAddress] = false;
     }
 
-    modifier OnlyContractOwnerCanDeleteAdmins() {
-        if (msg.sender != contractOwner) {
-            revert tipping__deleteAdmin__OnlyContractOwnerCanDeleteAdmins();
-        }
-        _;
+    /*
+    * @notice Always reverts. By default Ownable supports renouncing ownership, that is setting owner to address 0.
+    *         However in this case it would disallow receiving payment fees by anyone.
+    */
+    function renounceOwnership() public override view onlyOwner {
+        revert("Renouncing ownership is not supported");
     }
 
-    // Transfer contract ownership
-    function transferContractOwnership(address _newOwner)
-        public
-        OnlyContractOwnerCanChangeOwnership
-    {
-        require(
-            _newOwner != address(0),
-            "Ownable: new contractOwner is the zero address."
-        );
-        _transferOwnership(_newOwner);
-    }
-
-    modifier OnlyContractOwnerCanChangeOwnership() {
-        if (msg.sender != contractOwner) {
-            revert tipping__transferContractOwnership__OnlyContractOwnerCanChangeOwnership();
-        }
-        _;
-    }
-
-    // Helper function
-    function _transferOwnership(address _newOwner) internal virtual {
-        address oldOwner = contractOwner;
-        contractOwner = _newOwner;
-        emit OwnershipTransferred(oldOwner, _newOwner);
+    function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {
+        return interfaceId == type(IERC165).interfaceId
+         || interfaceId == type(ITipping).interfaceId;
     }
 }
