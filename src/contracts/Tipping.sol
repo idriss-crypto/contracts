@@ -2,7 +2,6 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -12,19 +11,12 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "./interfaces/ITipping.sol";
 
 error tipping__withdraw__OnlyAdminCanWithdraw();
-error tipping__addAdmin__OnlyContractOwnerCanAddAdmins();
-error tipping__deleteAdmin__OnlyContractOwnerCanDeleteAdmins();
 
 
 contract Tipping is Ownable, ITipping, IERC165 {
-    using SafeMath for uint256;
     address public contractOwner;
     mapping(address => uint256) public balanceOf;
     mapping(address => bool) public admins;
-
-    constructor () {
-        contractOwner = msg.sender;
-    }
 
     event TipMessage(
         address indexed recipientAddress,
@@ -35,9 +27,10 @@ contract Tipping is Ownable, ITipping, IERC165 {
 
     function sendTo(address _recipient, string memory _message) external payable override {
         (bool success, ) = _recipient.call{
-            value: msg.value.sub(msg.value.div(100))
+            value: msg.value - (msg.value / 100)
         }("");
         require(success, "Failed to send.");
+
         emit TipMessage(_recipient, _message, msg.sender, address(0));
     }
 
@@ -59,7 +52,7 @@ contract Tipping is Ownable, ITipping, IERC165 {
         );
 
         require(
-            paymentTc.transfer(_recipient, _amount.sub(_amount.div(100))),
+            paymentTc.transfer(_recipient, _amount - (_amount / 100)),
             "Transfer failed"
         );
 
@@ -95,13 +88,6 @@ contract Tipping is Ownable, ITipping, IERC165 {
         admins[_adminAddress] = true;
     }
 
-    modifier OnlyContractOwnerCanAddAdmins() {
-        if (msg.sender != contractOwner) {
-            revert tipping__addAdmin__OnlyContractOwnerCanAddAdmins();
-        }
-        _;
-    }
-
     function deleteAdmin(address _adminAddress)
         external
         override
@@ -115,7 +101,7 @@ contract Tipping is Ownable, ITipping, IERC165 {
     *         However in this case it would disallow receiving payment fees by anyone.
     */
     function renounceOwnership() public override view onlyOwner {
-        revert("Renouncing ownership is not supported");
+        revert("Operation not supported");
     }
 
     function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {
