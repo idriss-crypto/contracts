@@ -12,7 +12,12 @@ import "./interfaces/ITipping.sol";
 
 error tipping__withdraw__OnlyAdminCanWithdraw();
 
-
+/**
+ * @title Tipping
+ * @author Lennard (lennardevertz)
+ * @custom:contributor Rafał Kalinowski <deliriusz.eth@gmail.com>
+ * @notice Tipping is a helper smart contract used for IDriss social media tipping functionality
+ */
 contract Tipping is Ownable, ITipping, IERC165 {
     address public contractOwner;
     mapping(address => uint256) public balanceOf;
@@ -25,6 +30,9 @@ contract Tipping is Ownable, ITipping, IERC165 {
         address tokenAddress
     );
 
+    /**
+     * @notice Send native currency tip, charging a small fee
+     */
     function sendTo(address _recipient, string memory _message) external payable override {
         (bool success, ) = _recipient.call{
             value: msg.value - (msg.value / 100)
@@ -34,6 +42,9 @@ contract Tipping is Ownable, ITipping, IERC165 {
         emit TipMessage(_recipient, _message, msg.sender, address(0));
     }
 
+    /**
+     * @notice Send a tip in ERC20 token, charging a small fee
+     */
     function sendTokenTo(
         address _recipient,
         uint256 _amount,
@@ -59,6 +70,9 @@ contract Tipping is Ownable, ITipping, IERC165 {
         emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr);
     }
 
+    /**
+     * @notice Withdraw native currency transfer fees
+     */
     function withdraw() external override OnlyAdminCanWithdraw {
         (bool success, ) = msg.sender.call{value: address(this).balance}("");
         require(success, "Failed to withdraw.");
@@ -71,6 +85,9 @@ contract Tipping is Ownable, ITipping, IERC165 {
         _;
     }
 
+    /**
+     * @notice Withdraw ERC20 transfer fees
+     */
     function withdrawToken(address _tokenContract)
         external
         override
@@ -80,6 +97,9 @@ contract Tipping is Ownable, ITipping, IERC165 {
         withdrawTC.transfer(msg.sender, withdrawTC.balanceOf(address(this)));
     }
 
+    /**
+     * @notice Add admin with priviledged access
+     */
     function addAdmin(address _adminAddress)
         external
         override
@@ -88,6 +108,9 @@ contract Tipping is Ownable, ITipping, IERC165 {
         admins[_adminAddress] = true;
     }
 
+    /**
+     * @notice Remove admin
+     */
     function deleteAdmin(address _adminAddress)
         external
         override
@@ -104,6 +127,9 @@ contract Tipping is Ownable, ITipping, IERC165 {
         revert("Operation not supported");
     }
 
+    /**
+     * @notice ERC165 interface function implementation, listing all supported interfaces
+     */
     function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {
         return interfaceId == type(IERC165).interfaceId
          || interfaceId == type(ITipping).interfaceId;
