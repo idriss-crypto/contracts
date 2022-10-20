@@ -31,7 +31,7 @@ const ERC1155_ARRAY = [
    [5, 996]
 ]
 
-describe('SendToHashMock contract', async () => {
+describe('SendToHashMock contract internals', async () => {
    let owner: Signer;
    let signer1: Signer;
    let signer2: Signer;

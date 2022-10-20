@@ -19,6 +19,7 @@ import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
 import { AssetLiability, AssetIdAmount } from "./structs/IDrissStructs.sol";
 import { AssetType } from "./enums/IDrissEnums.sol";
 import { ConversionUtils } from "./libs/ConversionUtils.sol";
+import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
 
 
 /**
@@ -26,7 +27,7 @@ import { ConversionUtils } from "./libs/ConversionUtils.sol";
  * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
-contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165, IERC1155Receiver {
+contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, IERC721Receiver, IERC165, IERC1155Receiver {
     using SafeCast for int256;
 
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
@@ -92,15 +93,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         if (_assetType == AssetType.Token) {
             _sendTokenAssetFrom(paymentValue, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            uint256 [] memory assetIds = new uint[](1);
-            assetIds[0] = _assetId;
-            _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
+            _sendNFTAsset(_assetId, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
-            uint256 [] memory assetIds = new uint[](1);
-            assetIds[0] = _assetId;
-            uint256 [] memory assetAmounts = new uint[](1);
-            assetAmounts[0] = paymentValue;
-            _sendERC1155Asset(assetIds, assetAmounts, msg.sender, address(this), _assetContractAddress);
+            _sendERC1155Asset(_assetId, paymentValue, msg.sender, address(this), _assetContractAddress);
         }
 
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, paymentValue, _assetType, _message);
@@ -235,17 +230,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             if (_assetType == AssetType.NFT) {
                 uint256[] memory assetIds = beneficiaryAsset.assetIds[payers[i]];
                 delete beneficiaryAsset.assetIds[payers[i]];
-                _sendNFTAsset(assetIds, address(this), ownerIDrissAddr, _assetContractAddress);
+                _sendNFTAssetBatch(assetIds, address(this), ownerIDrissAddr, _assetContractAddress);
             } else if (_assetType == AssetType.ERC1155) {
                 AssetIdAmount[] memory assetAmountIds = beneficiaryAsset.assetIdAmounts[payers[i]];
-                uint256[] memory amounts = new uint256[](assetAmountIds.length);
-                uint256[] memory ids = new uint256[](assetAmountIds.length);
-                for (uint256 j = 0; j < assetAmountIds.length; ++j) {
-                    ids[j] = assetAmountIds[j].id;
-                    amounts[j] = assetAmountIds[j].amount;
-                }
                 delete beneficiaryAsset.assetIdAmounts[payers[i]];
-                _sendERC1155Asset(ids, amounts, address(this), ownerIDrissAddr, _assetContractAddress);
+                for (uint256 j = 0; j < assetAmountIds.length; ++j) {
+                    _sendERC1155Asset(assetAmountIds[j].id, assetAmountIds[j].amount, address(this), ownerIDrissAddr, _assetContractAddress);
+                }
             }
         }
 
@@ -311,7 +302,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else if (_assetType == AssetType.Token) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
+            _sendNFTAssetBatch(assetIds, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
             uint256[] memory amounts = new uint256[](assetAmountIds.length);
             uint256[] memory ids = new uint256[](assetAmountIds.length);
@@ -320,7 +311,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
                 amounts[j] = assetAmountIds[j].amount;
             }
 
-            _sendERC1155Asset(ids, amounts, address(this), msg.sender, _assetContractAddress);
+            _sendERC1155AssetBatch(ids, amounts, address(this), msg.sender, _assetContractAddress);
         }
 
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert, _assetType);
@@ -406,79 +397,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         paymentFeesBalance = 0;
 
         _sendCoin(msg.sender, amountToClaim);
-    }
-
-    /**
-    * @notice Wrapper for sending native Coin via call function
-    * @dev When using this function please make sure to not send it to anyone, verify the
-    *      address in IDriss registry
-    */
-    function _sendCoin (address _to, uint256 _amount) internal {
-        (bool sent, ) = payable(_to).call{value: _amount}("");
-        require(sent, "Failed to withdraw");
-    }
-
-    /**
-     * @notice Wrapper for sending ERC1155 asset with additional checks and iteraton over an array
-     * @dev due to how approval in ERC1155 standard is handled, the smart contract has to ask for permissions to manage
-     *      ALL tokens "for simplicity"... Hence, it has to be done before calling function that transfers the token
-     *      to smart contract, and revoked afterwards
-     */
-    function _sendERC1155Asset (
-        uint256[] memory _assetIds,
-        uint256[] memory _amounts,
-        address _from,
-        address _to,
-        address _contractAddress
-    ) internal {
-        IERC1155 nft = IERC1155(_contractAddress);
-        nft.safeBatchTransferFrom(_from, _to, _assetIds, _amounts, "");
-    }
-
-    /**
-     * @notice Wrapper for sending NFT asset with additional checks and iteraton over an array
-     */
-    function _sendNFTAsset (
-        uint256[] memory _assetIds,
-        address _from,
-        address _to,
-        address _contractAddress
-    ) internal {
-        require(_assetIds.length > 0, "Nothing to send");
-
-        IERC721 nft = IERC721(_contractAddress);
-        for (uint256 i = 0; i < _assetIds.length; ++i) {
-            nft.safeTransferFrom(_from, _to, _assetIds[i], "");
-        }
-    }
-
-    /**
-     * @notice Wrapper for sending ERC20 Token asset with additional checks
-     */
-    function _sendTokenAsset (
-        uint256 _amount,
-        address _to,
-        address _contractAddress
-    ) internal {
-        IERC20 token = IERC20(_contractAddress);
-
-        bool sent = token.transfer(_to, _amount);
-        require(sent, "Failed to transfer token");
-    }
-
-    /**
-     * @notice Wrapper for sending ERC20 token from specific account with additional checks and iteraton over an array
-     */
-    function _sendTokenAssetFrom (
-        uint256 _amount,
-        address _from,
-        address _to,
-        address _contractAddress
-    ) internal {
-        IERC20 token = IERC20(_contractAddress);
-
-        bool sent = token.transferFrom(_from, _to, _amount);
-        require(sent, "Failed to transfer token");
     }
 
     /**

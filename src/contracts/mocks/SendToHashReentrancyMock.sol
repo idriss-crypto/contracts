@@ -21,11 +21,11 @@ contract SendToHashReentrancyMock {
     }
 
     //ERC721 - overrides ERC1155 function
-    function safeBatchTransferFrom (
+    function safeTransferFrom (
         address,
         address,
-        uint256[] memory,
-        uint256[] memory,
+        uint256,
+        uint256,
         bytes calldata
     ) external {
         _sendToAnyoneReentrancy(AssetType.ERC1155);
