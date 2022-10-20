@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import { AssetType } from "../enums/IDrissEnums.sol";
+import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
 
 /**
  * @title FeeCalculator
@@ -22,6 +22,8 @@ contract FeeCalculator is Ownable {
     uint256 public PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
     uint256 public MINIMAL_PAYMENT_FEE = 1;
     uint256 public MINIMAL_PAYMENT_FEE_DENOMINATOR = 1;
+    // you have to pass your desired fee types in a constructor deriving this contract
+    mapping (AssetType => FeeType) FEE_TYPE_MAPPING;
 
     constructor(address _maticUsdAggregator) {
         require(_maticUsdAggregator != address(0), "Address cannot be 0");
@@ -51,7 +53,7 @@ contract FeeCalculator is Ownable {
      */
     function getPaymentFee(uint256 _value, AssetType _assetType) public view returns (uint256) {
         uint256 minimumPaymentFee = _getMinimumFee();
-        if (_assetType != AssetType.Coin) {
+        if (FEE_TYPE_MAPPING[_assetType] == FeeType.Constant) {
             return minimumPaymentFee;
         }
 

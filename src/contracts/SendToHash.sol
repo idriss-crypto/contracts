@@ -15,7 +15,7 @@ import 'hardhat/console.sol';
 import { ISendToHash } from "./interfaces/ISendToHash.sol";
 import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
 import { AssetLiability, AssetIdAmount } from "./structs/IDrissStructs.sol";
-import { AssetType } from "./enums/IDrissEnums.sol";
+import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 import { ConversionUtils } from "./libs/ConversionUtils.sol";
 import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
 import { FeeCalculator } from "./libs/FeeCalculator.sol";
@@ -56,6 +56,11 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, 
         _checkNonZeroAddress(_IDrissAddr, "IDriss address cannot be 0");
 
         IDRISS_ADDR = _IDrissAddr;
+
+        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
 
     /**

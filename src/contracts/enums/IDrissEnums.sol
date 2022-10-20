@@ -7,3 +7,8 @@ enum AssetType {
     NFT,
     ERC1155
 }
+
+enum FeeType {
+    Percentage,
+    Constant
+}
