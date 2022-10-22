@@ -30,6 +30,10 @@ contract Tipping is Ownable, ITipping, IERC165 {
         address tokenAddress
     );
 
+    constructor() {
+        admins[msg.sender] = true;
+    }
+
     /**
      * @notice Send native currency tip, charging a small fee
      */
@@ -73,12 +77,12 @@ contract Tipping is Ownable, ITipping, IERC165 {
     /**
      * @notice Withdraw native currency transfer fees
      */
-    function withdraw() external override OnlyAdminCanWithdraw {
+    function withdraw() external override onlyAdminCanWithdraw {
         (bool success, ) = msg.sender.call{value: address(this).balance}("");
         require(success, "Failed to withdraw.");
     }
 
-    modifier OnlyAdminCanWithdraw() {
+    modifier onlyAdminCanWithdraw() {
         if (admins[msg.sender] != true) {
             revert tipping__withdraw__OnlyAdminCanWithdraw();
         }
@@ -91,7 +95,7 @@ contract Tipping is Ownable, ITipping, IERC165 {
     function withdrawToken(address _tokenContract)
         external
         override
-        OnlyAdminCanWithdraw
+        onlyAdminCanWithdraw
     {
         IERC20 withdrawTC = IERC20(_tokenContract);
         withdrawTC.transfer(msg.sender, withdrawTC.balanceOf(address(this)));
