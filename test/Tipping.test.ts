@@ -55,7 +55,7 @@ describe('Tipping contract', async () => {
    let mockPriceOracle: MaticPriceAggregatorV3Mock
    let tippingContract: Tipping
    let provider: MockProvider
-   let dollarInWei
+   let dollarInWei: BigNumber
 
    before(async () => {
       provider = new MockProvider({ ganacheOptions: { gasLimit: 100000000 } })
@@ -67,8 +67,8 @@ describe('Tipping contract', async () => {
       signer1Address = await signer1.getAddress()
       signer2Address = await signer2.getAddress()
       signer3Address = await signer3.getAddress()
-      tippingContract = (await waffle.deployContract(owner, TippingArtifact, [])) as Tipping
       mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
+      tippingContract = (await waffle.deployContract(owner, TippingArtifact, [mockPriceOracle.address])) as Tipping
       dollarInWei = await mockPriceOracle.dollarToWei()
    })
 

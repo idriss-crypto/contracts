@@ -9,6 +9,10 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 import "./interfaces/ITipping.sol";
+import "./libs/MultiAssetSender.sol";
+import "./libs/FeeCalculator.sol";
+
+import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 
 error tipping__withdraw__OnlyAdminCanWithdraw();
 
@@ -18,7 +22,7 @@ error tipping__withdraw__OnlyAdminCanWithdraw();
  * @custom:contributor Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @notice Tipping is a helper smart contract used for IDriss social media tipping functionality
  */
-contract Tipping is Ownable, ITipping, IERC165 {
+contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 {
     address public contractOwner;
     mapping(address => uint256) public balanceOf;
     mapping(address => bool) public admins;
@@ -30,18 +34,21 @@ contract Tipping is Ownable, ITipping, IERC165 {
         address tokenAddress
     );
 
-    constructor() {
+    constructor(address _maticUsdAggregator) FeeCalculator(_maticUsdAggregator) {
         admins[msg.sender] = true;
+
+        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
 
     /**
      * @notice Send native currency tip, charging a small fee
      */
     function sendTo(address _recipient, string memory _message) external payable override {
-        (bool success, ) = _recipient.call{
-            value: msg.value - (msg.value / 100)
-        }("");
-        require(success, "Failed to send.");
+        (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value, AssetType.Coin);
+        _sendCoin(_recipient, paymentValue);
 
         emit TipMessage(_recipient, _message, msg.sender, address(0));
     }
