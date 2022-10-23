@@ -57,7 +57,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, 
 
         IDRISS_ADDR = _IDrissAddr;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.PercentageOrConstantMaximum;
         FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
@@ -79,7 +79,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, 
         string memory _message
     ) external override nonReentrant() payable {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
-        (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value);
+        (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value, _assetType);
         if (_assetType != AssetType.Coin) { fee = msg.value; }
         if (_assetType == AssetType.Token || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
         if (_assetType == AssetType.NFT) { paymentValue = 1; }

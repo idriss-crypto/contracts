@@ -53,11 +53,15 @@ contract FeeCalculator is Ownable {
      */
     function getPaymentFee(uint256 _value, AssetType _assetType) public view returns (uint256) {
         uint256 minimumPaymentFee = _getMinimumFee();
-        if (FEE_TYPE_MAPPING[_assetType] == FeeType.Constant) {
+        uint256 percentageFee = _getPercentageFee(_value);
+        FeeType feeType = FEE_TYPE_MAPPING[_assetType];
+        if (feeType == FeeType.Constant) {
             return minimumPaymentFee;
+        } else if (feeType == FeeType.Percentage) {
+            return percentageFee;
         }
 
-        uint256 percentageFee = _getPercentageFee(_value);
+        // default case - PercentageOrConstantMaximum
         if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
     }
 
@@ -71,27 +75,27 @@ contract FeeCalculator is Ownable {
 
     /**
      * @notice Calculates value of a fee from sent msg.value
-     * @param _value - payment value, taken from msg.value
+     * @param _valueToSplit - payment value, taken from msg.value
+     * @param _assetType - asset type, as there may be different calculation logic for each type
      * @return fee - processing fee, few percent of slippage is allowed
      * @return value - payment value after substracting fee
      */
-    function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
+    function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (uint256 fee, uint256 value) {
         uint256 minimalPaymentFee = _getMinimumFee();
-        uint256 feeFromValue = _getPercentageFee(_value);
+        uint256 paymentFee = getPaymentFee(_valueToSplit, _assetType);
 
-        if (feeFromValue > minimalPaymentFee) {
-            fee = feeFromValue;
-            // we accept slippage of matic price
-        } else if (_value >= minimalPaymentFee * (100 - PAYMENT_FEE_SLIPPAGE_PERCENT) / 100
-            && _value <= minimalPaymentFee) {
-            fee = _value;
+        // we accept slippage of matic price if fee type is not percentage - it this case we always get % no matter dollar price
+        if (FEE_TYPE_MAPPING[_assetType] != FeeType.Percentage
+            && _valueToSplit >= minimalPaymentFee * (100 - PAYMENT_FEE_SLIPPAGE_PERCENT) / 100
+            && _valueToSplit <= minimalPaymentFee) {
+            fee = _valueToSplit;
         } else {
-            fee = minimalPaymentFee;
+            fee = paymentFee;
         }
 
-        require (_value >= fee, "Value sent is smaller than minimal fee.");
+        require (_valueToSplit >= fee, "Value sent is smaller than minimal fee.");
 
-        value = _value - fee;
+        value = _valueToSplit - fee;
     }
 
 
