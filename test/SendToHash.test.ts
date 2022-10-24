@@ -226,10 +226,12 @@ describe('SendToHash contract', async () => {
    // It's lightweigth, because it performs contract deployments once
    describe('Common logic - lightweight', () => {
       before(async () => {
-         await setupSendToAnyone()
-         await setupERC20()
-         await setupERC721()
-         await setupERC1155()
+         await Promise.all([
+            setupSendToAnyone(),
+            setupERC20(),
+            setupERC721(),
+            setupERC1155()
+         ])
       })
 
       it('reverts when trying to renounce ownership', async () => {
@@ -347,10 +349,12 @@ describe('SendToHash contract', async () => {
 
    describe('Common logic', () => {
       beforeEach(async () => {
-         await setupSendToAnyone()
-         await setupERC20()
-         await setupERC721()
-         await setupERC1155()
+         await Promise.all([
+            setupSendToAnyone(),
+            setupERC20(),
+            setupERC721(),
+            setupERC1155()
+         ])
       })
 
       it ('reverts revertPayment() when trying go revert payment second time', async () => {
@@ -1086,8 +1090,10 @@ describe('SendToHash contract', async () => {
 
    describe('ERC20', async () => {
       beforeEach(async () => {
-         await setupSendToAnyone()
-         await setupERC20()
+         await Promise.all([
+            setupSendToAnyone(),
+            setupERC20()
+         ])
       })
 
       it ('reverts sendToAnyone() when receiver does not have allowance for a token', async () => {
@@ -1220,8 +1226,10 @@ describe('SendToHash contract', async () => {
 
    describe('ERC721', async () => {
       beforeEach(async () => {
-         await setupSendToAnyone()
-         await setupERC721()
+         await Promise.all([
+            setupSendToAnyone(),
+            setupERC721()
+         ])
       })
 
       it ('reverts sendToAnyone() when sender is not allowed to send an NFT', async () => {
@@ -1419,8 +1427,10 @@ describe('SendToHash contract', async () => {
 
    describe('ERC1155', async () => {
       beforeEach(async () => {
-         await setupSendToAnyone()
-         await setupERC1155()
+         await Promise.all([
+            setupSendToAnyone(),
+            setupERC1155()
+         ])
       })
 
       it ('reverts sendToAnyone() when sender is not allowed to send an ERC1155', async () => {
