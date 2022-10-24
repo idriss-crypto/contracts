@@ -158,6 +158,13 @@ describe('Tipping contract', async () => {
          expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(weiToSend / 100))
          expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToSend - weiToSend / 100))
       })
+
+      it('emits an event', async () => {
+         const weiToSend = 1_000_000
+         await expect(tippingContract.sendTo(signer1Address, "xyz", { value: weiToSend }))
+             .to.emit(tippingContract, 'TipMessage')
+             .withArgs(signer1Address, "xyz", ownerAddress, ZERO_ADDRESS);
+      })
    })
 
    describe('Send ERC20', () => {
@@ -166,16 +173,17 @@ describe('Tipping contract', async () => {
          mockToken2 = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
       })
 
-      it('allows for sending ERC20 to other address', async () => {
+      it('allows for sending asset to other address', async () => {
          const tokensToSend = 1_000_000
 
          await mockToken.increaseAllowance(tippingContract.address, tokensToSend)
          await tippingContract.sendTokenTo(signer1Address, tokensToSend, mockToken.address, "")
 
          expect(await mockToken.balanceOf(signer1Address)).to.equal(tokensToSend - tokensToSend / 100)
+         expect(await mockToken.balanceOf(tippingContract.address)).to.equal(tokensToSend / 100)
       })
 
-      it('properly calculates fee when sending ERC20', async () => {
+      it('properly calculates fee when sending asset', async () => {
          const tokensToSend = 1_000_000
          const ownerBalanceBefore = await mockToken.balanceOf(ownerAddress)
          expect(await mockToken.balanceOf(tippingContract.address)).to.equal(0)
@@ -189,6 +197,15 @@ describe('Tipping contract', async () => {
          expect(ownerBalanceAfter).to.equal(ownerBalanceBefore.sub(tokensToSend))
          expect(await mockToken.balanceOf(tippingContract.address)).to.equal(tokensToSend / 100)
          expect(await mockToken.balanceOf(signer1Address)).to.equal(tokensToSend - tokensToSend / 100)
+      })
+
+      it('emits an event', async () => {
+         const tokensToSend = 1_000_000
+         await mockToken.increaseAllowance(tippingContract.address, tokensToSend)
+
+         await expect(tippingContract.sendTokenTo(signer1Address, tokensToSend, mockToken.address, "xyz"))
+             .to.emit(tippingContract, 'TipMessage')
+             .withArgs(signer1Address, "xyz", ownerAddress, mockToken.address);
       })
    })
 
@@ -205,10 +222,38 @@ describe('Tipping contract', async () => {
          )
       })
 
-      it('properly calculates fee when sending ERC721', async () => {
+      it('properly calculates fee when sending asset', async () => {
+         const tokenToSend = 1
+         const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+
+         await mockNFT.approve(tippingContract.address, tokenToSend)
+         await tippingContract.sendERC721To(signer1Address, tokenToSend, mockNFT.address, "", { value: dollarInWei })
+
+         const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+         expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(dollarInWei))
       })
 
-      it('allows for sending ERC721 to other address', async () => {
+      it('allows for sending asset to other address', async () => {
+         const tokenToSend = 1
+
+         await mockNFT.approve(tippingContract.address, tokenToSend)
+         await tippingContract.sendERC721To(signer1Address, tokenToSend, mockNFT.address, "", { value: dollarInWei })
+
+         expect(await mockNFT.ownerOf(tokenToSend)).to.equal(signer1Address)
+      })
+
+      it('reverts when fee is too small', async () => {
+         await mockNFT.approve(tippingContract.address, 1)
+
+         await expect(tippingContract.sendERC721To(signer1Address, 1, mockNFT.address, "", { value: dollarInWei.div(2) }))
+             .to.be.revertedWith('Value sent is smaller than minimal fee.')
+      })
+
+      it('emits an event', async () => {
+         await mockNFT.approve(tippingContract.address, 1)
+         await expect(tippingContract.sendERC721To(signer1Address, 1, mockNFT.address, "xyz", { value: dollarInWei }))
+             .to.emit(tippingContract, 'TipMessage')
+             .withArgs(signer1Address, "xyz", ownerAddress, mockNFT.address);
       })
    })
 
@@ -225,10 +270,40 @@ describe('Tipping contract', async () => {
          )
       })
 
-      it('properly calculates fee when sending ERC1155', async () => {
+      it('properly calculates fee when sending asset', async () => {
+         const tokenToSend = 1
+         const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+
+         await mockERC1155.setApprovalForAll(tippingContract.address, true)
+         await tippingContract.sendERC1155To(signer1Address, tokenToSend, 1, mockERC1155.address, "", { value: dollarInWei })
+
+         const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+         expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(dollarInWei))
       })
 
-      it('allows for sending ERC1155 to other address', async () => {
+      it('allows for sending asset to other address', async () => {
+         const tokenToSend = 3
+
+         await mockERC1155.setApprovalForAll(tippingContract.address, true)
+         await tippingContract.sendERC1155To(signer1Address, tokenToSend, 2, mockERC1155.address, "", { value: dollarInWei })
+
+         expect(await mockERC1155.balanceOf(signer1Address, tokenToSend)).to.be.equal(2)
+      })
+
+      it('reverts when fee is too small', async () => {
+         await mockERC1155.setApprovalForAll(tippingContract.address, true)
+
+         await expect(tippingContract.sendERC1155To(signer1Address, 1, 1, mockERC1155.address, "", { value: dollarInWei.div(2) }))
+             .to.be.revertedWith('Value sent is smaller than minimal fee.')
+      })
+
+      it('emits an event', async () => {
+         const amountToSend = 10
+         await mockERC1155.setApprovalForAll(tippingContract.address, true)
+
+         await expect(tippingContract.sendERC1155To(signer1Address, 3, amountToSend, mockERC1155.address, "xyz", { value: dollarInWei }))
+             .to.emit(tippingContract, 'TipMessage')
+             .withArgs(signer1Address, "xyz", ownerAddress, mockERC1155.address);
       })
    })
 })

@@ -15,6 +15,21 @@ interface ITipping {
         string memory _message
     ) external payable;
 
+    function sendERC721To(
+        address _recipient,
+        uint256 _assetId,
+        address _nftContractAddress,
+        string memory _message
+    ) external payable;
+
+    function sendERC1155To(
+        address _recipient,
+        uint256 _assetId,
+        uint256 _amount,
+        address _nftContractAddress,
+        string memory _message
+    ) external payable;
+
     function withdraw() external;
 
     function withdrawToken(address _tokenContract) external;

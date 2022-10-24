@@ -30,8 +30,8 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 
     event TipMessage(
         address indexed recipientAddress,
         string message,
-        address sender,
-        address tokenAddress
+        address indexed sender,
+        address indexed tokenAddress
     );
 
     constructor(address _maticUsdAggregator) FeeCalculator(_maticUsdAggregator) {
@@ -47,7 +47,7 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 
      * @notice Send native currency tip, charging a small fee
      */
     function sendTo(address _recipient, string memory _message) external payable override {
-        (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value, AssetType.Coin);
+        (, uint256 paymentValue) = _splitPayment(msg.value, AssetType.Coin);
         _sendCoin(_recipient, paymentValue);
 
         emit TipMessage(_recipient, _message, msg.sender, address(0));
@@ -62,23 +62,47 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 
         address _tokenContractAddr,
         string memory _message
     ) external payable override {
-        IERC20 paymentTc = IERC20(_tokenContractAddr);
-        require(
-            paymentTc.allowance(msg.sender, address(this)) >= _amount,
-            "Insufficient Allowance"
-        );
+        (, uint256 paymentValue) = _splitPayment(_amount, AssetType.Token);
 
-        require(
-            paymentTc.transferFrom(msg.sender, address(this), _amount),
-            "Transfer failed"
-        );
-
-        require(
-            paymentTc.transfer(_recipient, _amount - (_amount / 100)),
-            "Transfer failed"
-        );
+        _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
+        _sendTokenAsset(paymentValue, _recipient, _tokenContractAddr);
 
         emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr);
+    }
+
+    /**
+     * @notice Send a tip in ERC721 token, charging a small $ fee
+     */
+    function sendERC721To(
+        address _recipient,
+        uint256 _tokenId,
+        address _nftContractAddress,
+        string memory _message
+    ) external payable override {
+        // we use it just to revert when value is too small
+        _splitPayment(msg.value, AssetType.NFT);
+
+        _sendNFTAsset(_tokenId, msg.sender, _recipient, _nftContractAddress);
+
+        emit TipMessage(_recipient, _message, msg.sender, _nftContractAddress);
+    }
+
+    /**
+     * @notice Send a tip in ERC721 token, charging a small $ fee
+     */
+    function sendERC1155To(
+        address _recipient,
+        uint256 _assetId,
+        uint256 _amount,
+        address _assetContractAddress,
+        string memory _message
+    ) external payable override {
+        // we use it just to revert when value is too small
+        _splitPayment(msg.value, AssetType.ERC1155);
+
+        _sendERC1155Asset(_assetId, _amount, msg.sender, _recipient, _assetContractAddress);
+
+        emit TipMessage(_recipient, _message, msg.sender, _assetContractAddress);
     }
 
     /**
