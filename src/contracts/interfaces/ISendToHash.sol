@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
+pragma solidity 0.8.17;
 
 import { AssetType } from "../enums/IDrissEnums.sol";
 
@@ -44,9 +44,4 @@ interface ISendToHash {
         string memory  _IDrissHash,
         string memory _claimPassword
     ) external pure returns (bytes32);
-
-    function getPaymentFee(
-        uint256 _value,
-        AssetType _assetType
-    ) external view returns (uint256);
 }

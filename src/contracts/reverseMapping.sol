@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
+pragma solidity ^0.8.7;
 
 interface IDriss {
     function getIDriss(string memory hashPub) external view returns (string memory);

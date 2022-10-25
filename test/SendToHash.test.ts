@@ -428,11 +428,11 @@ describe('SendToHash contract', async () => {
       await sendToHash.sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 0, "", {value: dollarInWei})
       await sendToHash.connect(signer1).sendToAnyone(signer1Hash, 1, ASSET_TYPE_ERC1155, mockERC1155.address, 1, "", {value: dollarInWei})
 
-      await expect('safeBatchTransferFrom').to.be
-          .calledOnContractWith(mockERC1155, [ownerAddress, sendToHash.address, [0], [1], "0x"])
+      await expect('safeTransferFrom').to.be
+          .calledOnContractWith(mockERC1155, [ownerAddress, sendToHash.address, 0, 1, "0x"])
 
-      await expect('safeBatchTransferFrom').to.be
-          .calledOnContractWith(mockERC1155, [signer1Address, sendToHash.address, [1], [1], "0x"])
+      await expect('safeTransferFrom').to.be
+          .calledOnContractWith(mockERC1155, [signer1Address, sendToHash.address, 1, 1, "0x"])
 
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 0)).to.be.equal(1)
       expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 1)).to.be.equal(1)
@@ -1293,8 +1293,12 @@ describe('SendToHash contract', async () => {
 
       await sendToHash.connect(signer2).claim(signer2HashForClaim, signer2ClaimPassword, ASSET_TYPE_ERC1155, mockERC1155.address)
 
-      await expect('safeBatchTransferFrom').to.be
-          .calledOnContractWith(mockERC1155, [sendToHash.address, signer2Address, [0,1,3], [1,1,5], "0x"])
+      await expect('safeTransferFrom').to.be
+          .calledOnContractWith(mockERC1155, [sendToHash.address, signer2Address, [0], [1], "0x"])
+      await expect('safeTransferFrom').to.be
+          .calledOnContractWith(mockERC1155, [sendToHash.address, signer2Address, [1], [1], "0x"])
+      await expect('safeTransferFrom').to.be
+          .calledOnContractWith(mockERC1155, [sendToHash.address, signer2Address, [3], [5], "0x"])
    })
 
    it ('properly handles moving tokens multiple times in moveAssetToOtherHash()', async () => {
@@ -1453,8 +1457,8 @@ describe('SendToHash contract', async () => {
 
       await sendToHash.connect(signer1).claim(signer1HashForClaim, signer1ClaimPassword, ASSET_TYPE_ERC1155, mockERC1155.address)
 
-      await expect('safeBatchTransferFrom').to.be
-          .calledOnContractWith(mockERC1155, [sendToHash.address, signer1Address, [2], [1], "0x"])
+      await expect('safeTransferFrom').to.be
+          .calledOnContractWith(mockERC1155, [sendToHash.address, signer1Address, 2, 1, "0x"])
 
       expect(await mockToken.balanceOf(signer1Address)).to.be.equal(5)
       expect(await mockToken.balanceOf(sendToHash.address)).to.be.equal(0)

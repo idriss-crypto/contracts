@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
-
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -17,8 +15,10 @@ import 'hardhat/console.sol';
 import { ISendToHash } from "./interfaces/ISendToHash.sol";
 import { IIDrissRegistry } from "./interfaces/IIDrissRegistry.sol";
 import { AssetLiability, AssetIdAmount } from "./structs/IDrissStructs.sol";
-import { AssetType } from "./enums/IDrissEnums.sol";
+import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 import { ConversionUtils } from "./libs/ConversionUtils.sol";
+import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
+import { FeeCalculator } from "./libs/FeeCalculator.sol";
 
 
 /**
@@ -26,7 +26,7 @@ import { ConversionUtils } from "./libs/ConversionUtils.sol";
  * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
-contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, IERC165, IERC1155Receiver {
+contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, FeeCalculator, IERC721Receiver, IERC165, IERC1155Receiver {
     using SafeCast for int256;
 
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
@@ -38,13 +38,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     // beneficiaryHash => assetType => assetAddress => payer => didPay
     mapping(bytes32 => mapping(AssetType => mapping(address => mapping(address => bool)))) beneficiaryPayersMap;
 
-    AggregatorV3Interface internal immutable MATIC_USD_PRICE_FEED;
     address public immutable IDRISS_ADDR;
-    uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
-    uint256 public PAYMENT_FEE_PERCENTAGE = 10;
-    uint256 public PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
-    uint256 public MINIMAL_PAYMENT_FEE = 1;
-    uint256 public MINIMAL_PAYMENT_FEE_DENOMINATOR = 1;
     uint256 public paymentFeesBalance;
 
     event AssetTransferred(bytes32 indexed toHash, address indexed from,
@@ -58,12 +52,15 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
 
     error IDrissMappings__ERC1155_Batch_Transfers_Unsupported();
 
-    constructor( address _IDrissAddr, address _maticUsdAggregator) {
+    constructor(address _IDrissAddr, address _maticUsdAggregator) FeeCalculator(_maticUsdAggregator) {
         _checkNonZeroAddress(_IDrissAddr, "IDriss address cannot be 0");
-        _checkNonZeroAddress(_maticUsdAggregator, "Matic price feed address cannot be 0");
 
         IDRISS_ADDR = _IDrissAddr;
-        MATIC_USD_PRICE_FEED = AggregatorV3Interface(_maticUsdAggregator);
+
+        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.PercentageOrConstantMaximum;
+        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
 
     /**
@@ -82,7 +79,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         string memory _message
     ) external override nonReentrant() payable {
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
-        (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value);
+        (uint256 fee, uint256 paymentValue) = _splitPayment(msg.value, _assetType);
         if (_assetType != AssetType.Coin) { fee = msg.value; }
         if (_assetType == AssetType.Token || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
         if (_assetType == AssetType.NFT) { paymentValue = 1; }
@@ -92,15 +89,9 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         if (_assetType == AssetType.Token) {
             _sendTokenAssetFrom(paymentValue, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            uint256 [] memory assetIds = new uint[](1);
-            assetIds[0] = _assetId;
-            _sendNFTAsset(assetIds, msg.sender, address(this), _assetContractAddress);
+            _sendNFTAsset(_assetId, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
-            uint256 [] memory assetIds = new uint[](1);
-            assetIds[0] = _assetId;
-            uint256 [] memory assetAmounts = new uint[](1);
-            assetAmounts[0] = paymentValue;
-            _sendERC1155Asset(assetIds, assetAmounts, msg.sender, address(this), _assetContractAddress);
+            _sendERC1155Asset(_assetId, paymentValue, msg.sender, address(this), _assetContractAddress);
         }
 
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, paymentValue, _assetType, _message);
@@ -156,55 +147,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     }
 
     /**
-     * @notice Calculates payment fee 
-     * @param _value - payment value
-     * @param _assetType - asset type, required as ERC20 & ERC721 only take minimal fee
-     * @return fee - processing fee, few percent of slippage is allowed
-     */
-    function getPaymentFee(uint256 _value, AssetType _assetType) public view override returns (uint256) {
-        uint256 minimumPaymentFee = _getMinimumFee();
-        if (_assetType != AssetType.Coin) {
-            return minimumPaymentFee;
-        }
-
-        uint256 percentageFee = _getPercentageFee(_value);
-        if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
-    }
-
-    function _getMinimumFee() internal view returns (uint256) {
-        return (_dollarToWei() * MINIMAL_PAYMENT_FEE) / MINIMAL_PAYMENT_FEE_DENOMINATOR;
-    }
-
-    function _getPercentageFee(uint256 _value) internal view returns (uint256) {
-        return (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
-    }
-
-    /**
-     * @notice Calculates value of a fee from sent msg.value
-     * @param _value - payment value, taken from msg.value 
-     * @return fee - processing fee, few percent of slippage is allowed
-     * @return value - payment value after substracting fee
-     */
-    function _splitPayment(uint256 _value) internal view returns (uint256 fee, uint256 value) {
-        uint256 minimalPaymentFee = _getMinimumFee();
-        uint256 feeFromValue = _getPercentageFee(_value);
-
-        if (feeFromValue > minimalPaymentFee) {
-            fee = feeFromValue;
-        // we accept slippage of matic price
-        } else if (_value >= minimalPaymentFee * (100 - PAYMENT_FEE_SLIPPAGE_PERCENT) / 100
-                        && _value <= minimalPaymentFee) {
-            fee = _value;
-        } else {
-            fee = minimalPaymentFee;
-        }
-
-        require (_value >= fee, "Value sent is smaller than minimal fee.");
-
-        value = _value - fee;
-    }
-
-    /**
      * @notice Allows claiming assets by an IDriss owner
      */
     function claim (
@@ -235,17 +177,13 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
             if (_assetType == AssetType.NFT) {
                 uint256[] memory assetIds = beneficiaryAsset.assetIds[payers[i]];
                 delete beneficiaryAsset.assetIds[payers[i]];
-                _sendNFTAsset(assetIds, address(this), ownerIDrissAddr, _assetContractAddress);
+                _sendNFTAssetBatch(assetIds, address(this), ownerIDrissAddr, _assetContractAddress);
             } else if (_assetType == AssetType.ERC1155) {
                 AssetIdAmount[] memory assetAmountIds = beneficiaryAsset.assetIdAmounts[payers[i]];
-                uint256[] memory amounts = new uint256[](assetAmountIds.length);
-                uint256[] memory ids = new uint256[](assetAmountIds.length);
-                for (uint256 j = 0; j < assetAmountIds.length; ++j) {
-                    ids[j] = assetAmountIds[j].id;
-                    amounts[j] = assetAmountIds[j].amount;
-                }
                 delete beneficiaryAsset.assetIdAmounts[payers[i]];
-                _sendERC1155Asset(ids, amounts, address(this), ownerIDrissAddr, _assetContractAddress);
+                for (uint256 j = 0; j < assetAmountIds.length; ++j) {
+                    _sendERC1155Asset(assetAmountIds[j].id, assetAmountIds[j].amount, address(this), ownerIDrissAddr, _assetContractAddress);
+                }
             }
         }
 
@@ -311,7 +249,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         } else if (_assetType == AssetType.Token) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
-            _sendNFTAsset(assetIds, address(this), msg.sender, _assetContractAddress);
+            _sendNFTAssetBatch(assetIds, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
             uint256[] memory amounts = new uint256[](assetAmountIds.length);
             uint256[] memory ids = new uint256[](assetAmountIds.length);
@@ -320,7 +258,7 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
                 amounts[j] = assetAmountIds[j].amount;
             }
 
-            _sendERC1155Asset(ids, amounts, address(this), msg.sender, _assetContractAddress);
+            _sendERC1155AssetBatch(ids, amounts, address(this), msg.sender, _assetContractAddress);
         }
 
         emit AssetTransferReverted(_IDrissHash, msg.sender, adjustedAssetAddress, amountToRevert, _assetType);
@@ -409,79 +347,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     }
 
     /**
-    * @notice Wrapper for sending native Coin via call function
-    * @dev When using this function please make sure to not send it to anyone, verify the
-    *      address in IDriss registry
-    */
-    function _sendCoin (address _to, uint256 _amount) internal {
-        (bool sent, ) = payable(_to).call{value: _amount}("");
-        require(sent, "Failed to withdraw");
-    }
-
-    /**
-     * @notice Wrapper for sending ERC1155 asset with additional checks and iteraton over an array
-     * @dev due to how approval in ERC1155 standard is handled, the smart contract has to ask for permissions to manage
-     *      ALL tokens "for simplicity"... Hence, it has to be done before calling function that transfers the token
-     *      to smart contract, and revoked afterwards
-     */
-    function _sendERC1155Asset (
-        uint256[] memory _assetIds,
-        uint256[] memory _amounts,
-        address _from,
-        address _to,
-        address _contractAddress
-    ) internal {
-        IERC1155 nft = IERC1155(_contractAddress);
-        nft.safeBatchTransferFrom(_from, _to, _assetIds, _amounts, "");
-    }
-
-    /**
-     * @notice Wrapper for sending NFT asset with additional checks and iteraton over an array
-     */
-    function _sendNFTAsset (
-        uint256[] memory _assetIds,
-        address _from,
-        address _to,
-        address _contractAddress
-    ) internal {
-        require(_assetIds.length > 0, "Nothing to send");
-
-        IERC721 nft = IERC721(_contractAddress);
-        for (uint256 i = 0; i < _assetIds.length; ++i) {
-            nft.safeTransferFrom(_from, _to, _assetIds[i], "");
-        }
-    }
-
-    /**
-     * @notice Wrapper for sending ERC20 Token asset with additional checks
-     */
-    function _sendTokenAsset (
-        uint256 _amount,
-        address _to,
-        address _contractAddress
-    ) internal {
-        IERC20 token = IERC20(_contractAddress);
-
-        bool sent = token.transfer(_to, _amount);
-        require(sent, "Failed to transfer token");
-    }
-
-    /**
-     * @notice Wrapper for sending ERC20 token from specific account with additional checks and iteraton over an array
-     */
-    function _sendTokenAssetFrom (
-        uint256 _amount,
-        address _from,
-        address _to,
-        address _contractAddress
-    ) internal {
-        IERC20 token = IERC20(_contractAddress);
-
-        bool sent = token.transferFrom(_from, _to, _amount);
-        require(sent, "Failed to transfer token");
-    }
-
-    /**
     * @notice Check if an address is a deployed contract
     * @dev IMPORTANT!! This function is used for very specific reason, i.e. to check
     *      if ERC20 or ERC721 is already deployed before trying to interact with it.
@@ -521,20 +386,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
         _checkNonZeroAddress(IDrissAddress, "Address for the IDriss hash cannot resolve to 0x0");
     }
 
-    /*
-    * @notice Get current amount of wei in a dollar
-    * @dev ChainLink officially supports only USD -> MATIC,
-    *      so we have to convert it back to get current amount of wei in a dollar
-    */
-    function _dollarToWei() internal view returns (uint256) {
-        (,int256 maticPrice,,,) = MATIC_USD_PRICE_FEED.latestRoundData();
-        require (maticPrice > 0, "Unable to retrieve MATIC price.");
-
-        uint256 maticPriceMultiplier = 10**MATIC_USD_PRICE_FEED.decimals();
-
-        return(10**18 * maticPriceMultiplier) / uint256(maticPrice);
-    }
-
     /**
     * @notice Helper function to check if address is non-zero. Reverts with passed message in that casee.
     */
@@ -547,32 +398,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, IERC721Receiver, I
     */
     function _checkNonZeroValue (uint256 _value, string memory message) internal pure {
         require(_value > 0, message);
-    }
-
-    /**
-    * @notice adjust payment fee percentage for big native currenct transfers
-    * @dev Solidity is not good when it comes to handling floats. We use denominator then, 
-    *      e.g. to set payment fee to 1.5% , just pass paymentFee = 15 & denominator = 1000 => 15 / 1000 = 0.015 = 1.5%
-    */
-    function changePaymentFeePercentage (uint256 _paymentFeePercentage, uint256 _paymentFeeDenominator) external onlyOwner {
-        _checkNonZeroValue(_paymentFeePercentage, "Payment fee has to be bigger than 0");
-        _checkNonZeroValue(_paymentFeeDenominator, "Payment fee denominator has to be bigger than 0");
-
-        PAYMENT_FEE_PERCENTAGE = _paymentFeePercentage;
-        PAYMENT_FEE_PERCENTAGE_DENOMINATOR = _paymentFeeDenominator;
-    }
-
-    /**
-    * @notice adjust minimal payment fee for all asset transfers
-    * @dev Solidity is not good when it comes to handling floats. We use denominator then, 
-    *      e.g. to set minimal payment fee to 2.2$ , just pass paymentFee = 22 & denominator = 10 => 22 / 10 = 2.2
-    */
-    function changeMinimalPaymentFee (uint256 _minimalPaymentFee, uint256 _paymentFeeDenominator) external onlyOwner {
-        _checkNonZeroValue(_minimalPaymentFee, "Payment fee has to be bigger than 0");
-        _checkNonZeroValue(_paymentFeeDenominator, "Payment fee denominator has to be bigger than 0");
-
-        MINIMAL_PAYMENT_FEE = _minimalPaymentFee;
-        MINIMAL_PAYMENT_FEE_DENOMINATOR = _paymentFeeDenominator;
     }
 
     /**

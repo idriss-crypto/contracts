@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
+pragma solidity 0.8.17;
 
 import { ISendToHash } from "../interfaces/ISendToHash.sol";
 import { AssetType } from "../enums/IDrissEnums.sol";
@@ -21,11 +21,11 @@ contract SendToHashReentrancyMock {
     }
 
     //ERC721 - overrides ERC1155 function
-    function safeBatchTransferFrom (
+    function safeTransferFrom (
         address,
         address,
-        uint256[] memory,
-        uint256[] memory,
+        uint256,
+        uint256,
         bytes calldata
     ) external {
         _sendToAnyoneReentrancy(AssetType.ERC1155);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.7;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -39,7 +39,7 @@ contract MockNFT is ERC721, Ownable {
  * custom:experimental used only as a mock for tests
  */
 contract MockERC1155 is ERC1155, Ownable {
-    constructor() ERC1155("http://example.xyz") { }
+    constructor() ERC1155("https://ipfs.io/ipfs/QmSknFJz1Z16xKGBJPF41DPsCzyzCYqBD8ZmVmnyaN1Vw4/{id}") { }
 
     function mint(address to, uint256 tokenId, uint256 amount) public onlyOwner() {
         _mint(to, tokenId, amount, "");
