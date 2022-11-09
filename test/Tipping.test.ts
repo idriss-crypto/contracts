@@ -1,5 +1,5 @@
 import { ethers, waffle } from 'hardhat'
-import { BigNumber, Signer } from 'ethers'
+import { BigNumber, BigNumberish, Signer } from 'ethers'
 import chai, { expect } from 'chai'
 import {
    Tipping,
@@ -16,16 +16,12 @@ import MockTokenArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegist
 import chaiAsPromised from 'chai-as-promised'
 import { MockProvider, solidity } from 'ethereum-waffle'
 
-import { negateBigNumber } from './TestUtils'
 import {before, beforeEach} from "mocha";
+import {Interface} from "ethers/lib/utils";
 
 chai.use(solidity) // solidity matchers, e.g. expect().to.be.revertedWith("message")
 chai.use(chaiAsPromised) //eventually
 
-const ASSET_TYPE_COIN = 0
-const ASSET_TYPE_TOKEN = 1
-const ASSET_TYPE_NFT = 2
-const ASSET_TYPE_ERC1155 = 3
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const NFT_ID_ARRAY = [... Array(10).keys()]
 const ERC1155_ARRAY = [
@@ -56,6 +52,62 @@ describe('Tipping contract', async () => {
    let tippingContract: Tipping
    let provider: MockProvider
    let dollarInWei: BigNumber
+   let tippingInterface: Interface
+
+   const sendTokenToBytes = (to: string, amount: BigNumberish,
+                             assetContractAddress = ZERO_ADDRESS,
+                             message = ''): string => {
+      return tippingInterface.encodeFunctionData('sendTokenTo',
+          [to, amount, assetContractAddress, message])
+   }
+
+   const sendERC721ToBytes = (to: string, assetId = 0,
+                              assetContractAddress = ZERO_ADDRESS,
+                              message = ''): string => {
+      return tippingInterface.encodeFunctionData('sendERC721To',
+          [to, assetId, assetContractAddress, message])
+   }
+
+   const sendERC1155ToBytes = (to: string, assetId = 0, amount: BigNumberish,
+                               assetContractAddress = ZERO_ADDRESS,
+                               message = ''): string => {
+      return tippingInterface.encodeFunctionData('sendERC1155To',
+          [to, assetId, amount, assetContractAddress, message])
+   }
+
+   const sendToToBytes = (to: string, amount: BigNumberish, message = ''): string => {
+      return tippingInterface.encodeFunctionData('sendTo',
+          [to, amount, message])
+   }
+
+   const setupToken = async () => {
+      mockToken = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
+      mockToken2 = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
+   }
+
+   const setupERC721 = async () => {
+      mockNFT = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
+      mockNFT2 = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
+
+      await Promise.all(
+          NFT_ID_ARRAY.map( async (val, idx, _) => {
+             await mockNFT.safeMint(ownerAddress, val).catch(_ => {})
+             return mockNFT2.safeMint(ownerAddress, val).catch(_ => {})
+          })
+      )
+   }
+
+   const setupERC1155 = async () => {
+      mockERC1155 = (await waffle.deployContract(owner, MockERC1155Artifact, [])) as MockERC1155
+      mockERC1155_2 = (await waffle.deployContract(owner, MockERC1155Artifact, [])) as MockERC1155
+
+      await Promise.all(
+          ERC1155_ARRAY.map( async (val, idx, _) => {
+             await mockERC1155.mint(ownerAddress, val[0],  val[1]).catch(_ => {})
+             return mockERC1155_2.mint(ownerAddress, val[0],  val[1]).catch(_ => {})
+          })
+      )
+   }
 
    before(async () => {
       provider = new MockProvider({ ganacheOptions: { gasLimit: 100000000 } })
@@ -70,6 +122,8 @@ describe('Tipping contract', async () => {
       mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
       tippingContract = (await waffle.deployContract(owner, TippingArtifact, [mockPriceOracle.address])) as Tipping
       dollarInWei = await mockPriceOracle.dollarToWei()
+
+      tippingInterface = new ethers.utils.Interface(TippingArtifact.abi);
    })
 
    describe('Contract management', async () => {
@@ -139,7 +193,7 @@ describe('Tipping contract', async () => {
          const weiToSend = 1_000_000
          const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
 
-         await tippingContract.sendTo(signer1Address, "", { value: weiToSend })
+         await tippingContract.sendTo(signer1Address, 0, "", { value: weiToSend })
 
          const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
          expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(weiToSend / 100))
@@ -150,7 +204,7 @@ describe('Tipping contract', async () => {
          const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
          const sig1BalanceBefore = await provider.getBalance(signer1Address)
 
-         await tippingContract.sendTo(signer1Address, "", { value: weiToSend })
+         await tippingContract.sendTo(signer1Address, 0, "", { value: weiToSend })
 
          const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
          const sig1BalanceAfter = await provider.getBalance(signer1Address)
@@ -159,9 +213,30 @@ describe('Tipping contract', async () => {
          expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToSend - weiToSend / 100))
       })
 
+      it('allows sending asset to other address as batch', async () => {
+         const weiToSend = 1_000_000
+         const weiToSend2 = 2_500_000
+         const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+         const sig1BalanceBefore = await provider.getBalance(signer1Address)
+         const sig2BalanceBefore = await provider.getBalance(signer2Address)
+
+         await tippingContract.batch([
+            sendToToBytes(signer1Address, weiToSend, ""),
+            sendToToBytes(signer2Address, weiToSend2, "")
+         ], { value: BigNumber.from(weiToSend).add(weiToSend2) })
+
+         const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+         const sig1BalanceAfter = await provider.getBalance(signer1Address)
+         const sig2BalanceAfter = await provider.getBalance(signer2Address)
+
+         expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(weiToSend / 100).add(weiToSend2 / 100))
+         expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToSend - weiToSend / 100))
+         expect(sig2BalanceAfter).to.equal(sig2BalanceBefore.add(weiToSend2 - weiToSend2 / 100))
+      })
+
       it('emits an event', async () => {
          const weiToSend = 1_000_000
-         await expect(tippingContract.sendTo(signer1Address, "xyz", { value: weiToSend }))
+         await expect(tippingContract.sendTo(signer1Address, 0, "xyz", { value: weiToSend }))
              .to.emit(tippingContract, 'TipMessage')
              .withArgs(signer1Address, "xyz", ownerAddress, ZERO_ADDRESS);
       })
@@ -169,8 +244,7 @@ describe('Tipping contract', async () => {
 
    describe('Send ERC20', () => {
       beforeEach(async () => {
-         mockToken = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
-         mockToken2 = (await waffle.deployContract(owner, MockTokenArtifact, [])) as MockToken
+         await setupToken()
       })
 
       it('allows for sending asset to other address', async () => {
@@ -181,6 +255,20 @@ describe('Tipping contract', async () => {
 
          expect(await mockToken.balanceOf(signer1Address)).to.equal(tokensToSend - tokensToSend / 100)
          expect(await mockToken.balanceOf(tippingContract.address)).to.equal(tokensToSend / 100)
+      })
+
+      it('allows sending asset to other address as batch', async () => {
+         const tokensToSend = 1_000_000
+
+         await mockToken.increaseAllowance(tippingContract.address, tokensToSend * 2)
+         await tippingContract.batch([
+            sendTokenToBytes(signer1Address, tokensToSend, mockToken.address, ""),
+            sendTokenToBytes(signer2Address, tokensToSend, mockToken.address, "")
+         ])
+
+         expect(await mockToken.balanceOf(signer1Address)).to.equal(tokensToSend - tokensToSend / 100)
+         expect(await mockToken.balanceOf(signer2Address)).to.equal(tokensToSend - tokensToSend / 100)
+         expect(await mockToken.balanceOf(tippingContract.address)).to.equal((tokensToSend / 100) * 2)
       })
 
       it('properly calculates fee when sending asset', async () => {
@@ -211,15 +299,7 @@ describe('Tipping contract', async () => {
 
    describe('Send ERC721', () => {
       beforeEach(async () => {
-         mockNFT = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
-         mockNFT2 = (await waffle.deployContract(owner, MockNFTArtifact, [])) as MockNFT
-
-         await Promise.all(
-             NFT_ID_ARRAY.map( async (val, idx, _) => {
-                await mockNFT.safeMint(ownerAddress, val).catch(_ => {})
-                return mockNFT2.safeMint(ownerAddress, val).catch(_ => {})
-             })
-         )
+         await setupERC721()
       })
 
       it('properly calculates fee when sending asset', async () => {
@@ -242,6 +322,22 @@ describe('Tipping contract', async () => {
          expect(await mockNFT.ownerOf(tokenToSend)).to.equal(signer1Address)
       })
 
+      it('allows for sending asset to other address as batch', async () => {
+         const tokenToSend = 2
+         const tokenToSend2 = 3
+
+         await mockNFT.approve(tippingContract.address, tokenToSend)
+         await mockNFT.approve(tippingContract.address, tokenToSend2)
+
+         await tippingContract.batch([
+            sendERC721ToBytes(signer1Address, tokenToSend, mockNFT.address, ""),
+            sendERC721ToBytes(signer2Address, tokenToSend2, mockNFT.address, "")
+         ], { value: dollarInWei.mul(2) })
+
+         expect(await mockNFT.ownerOf(tokenToSend)).to.equal(signer1Address)
+         expect(await mockNFT.ownerOf(tokenToSend2)).to.equal(signer2Address)
+      })
+
       it('reverts when fee is too small', async () => {
          await mockNFT.approve(tippingContract.address, 1)
 
@@ -259,15 +355,7 @@ describe('Tipping contract', async () => {
 
    describe('Send ERC1155', () => {
       beforeEach(async () => {
-         mockERC1155 = (await waffle.deployContract(owner, MockERC1155Artifact, [])) as MockERC1155
-         mockERC1155_2 = (await waffle.deployContract(owner, MockERC1155Artifact, [])) as MockERC1155
-
-         await Promise.all(
-             ERC1155_ARRAY.map( async (val, idx, _) => {
-                await mockERC1155.mint(ownerAddress, val[0],  val[1]).catch(_ => {})
-                return mockERC1155_2.mint(ownerAddress, val[0],  val[1]).catch(_ => {})
-             })
-         )
+         await setupERC1155()
       })
 
       it('properly calculates fee when sending asset', async () => {
@@ -290,6 +378,19 @@ describe('Tipping contract', async () => {
          expect(await mockERC1155.balanceOf(signer1Address, tokenToSend)).to.be.equal(2)
       })
 
+      it('allows for sending asset to other address as batch', async () => {
+         const tokenToSend = 3
+
+         await mockERC1155.setApprovalForAll(tippingContract.address, true)
+         await tippingContract.batch([
+            sendERC1155ToBytes(signer1Address, tokenToSend, 2, mockERC1155.address, ""),
+            sendERC1155ToBytes(signer2Address, tokenToSend, 3, mockERC1155.address, "")
+         ], { value: dollarInWei.mul(2) })
+
+         expect(await mockERC1155.balanceOf(signer1Address, tokenToSend)).to.be.equal(2)
+         expect(await mockERC1155.balanceOf(signer2Address, tokenToSend)).to.be.equal(3)
+      })
+
       it('reverts when fee is too small', async () => {
          await mockERC1155.setApprovalForAll(tippingContract.address, true)
 
@@ -304,6 +405,45 @@ describe('Tipping contract', async () => {
          await expect(tippingContract.sendERC1155To(signer1Address, 3, amountToSend, mockERC1155.address, "xyz", { value: dollarInWei }))
              .to.emit(tippingContract, 'TipMessage')
              .withArgs(signer1Address, "xyz", ownerAddress, mockERC1155.address);
+      })
+   })
+
+   describe('Send multiple assets', () => {
+      before(async () => {
+         await Promise.all([
+             setupToken(),
+             setupERC721(),
+             setupERC1155()
+         ])
+      })
+
+      it('properly sends multiple assets', async () => {
+         const weiToSend = 1_000_000
+         const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+
+         await mockToken.increaseAllowance(tippingContract.address, 50)
+         await mockNFT.approve(tippingContract.address, 0)
+         await mockERC1155.setApprovalForAll(tippingContract.address, true)
+
+         await tippingContract.batch([
+            sendToToBytes(signer1Address, weiToSend, ""),
+            sendTokenToBytes(signer1Address, 50, mockToken.address, ""),
+            sendERC721ToBytes(signer2Address, 0, mockNFT.address, ""),
+            sendERC1155ToBytes(signer1Address, 3, 20, mockERC1155.address, ""),
+            sendToToBytes(signer2Address, weiToSend, "")
+         ], { value: dollarInWei.mul(2).add(weiToSend).add(weiToSend) })
+
+         const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+         expect(tippingContractBalanceAfter).to.equal(dollarInWei.mul(2).add(tippingContractBalanceBefore).add((weiToSend / 100) * 2))
+      })
+
+      it('reverts when trying to send more than msg.value', async () => {
+         await mockToken.increaseAllowance(tippingContract.address, 50)
+
+         await expect(tippingContract.batch([
+            sendTokenToBytes(signer1Address, 50, mockToken.address, ""),
+            sendToToBytes(signer1Address, dollarInWei.mul(2), ""),
+         ], { value: dollarInWei })).to.be.revertedWith('Can\'t send more than msg.value')
       })
    })
 })

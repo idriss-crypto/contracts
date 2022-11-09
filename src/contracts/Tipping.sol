@@ -8,9 +8,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
-import "./interfaces/ITipping.sol";
-import "./libs/MultiAssetSender.sol";
-import "./libs/FeeCalculator.sol";
+import { ITipping } from "./interfaces/ITipping.sol";
+import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
+import { FeeCalculator } from "./libs/FeeCalculator.sol";
+import { Batchable } from "./libs/Batchable.sol";
 
 import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 
@@ -22,7 +23,7 @@ error tipping__withdraw__OnlyAdminCanWithdraw();
  * @custom:contributor Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @notice Tipping is a helper smart contract used for IDriss social media tipping functionality
  */
-contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 {
+contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchable, IERC165 {
     address public contractOwner;
     mapping(address => uint256) public balanceOf;
     mapping(address => bool) public admins;
@@ -46,8 +47,13 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 
     /**
      * @notice Send native currency tip, charging a small fee
      */
-    function sendTo(address _recipient, string memory _message) external payable override {
-        (, uint256 paymentValue) = _splitPayment(msg.value, AssetType.Coin);
+    function sendTo(
+        address _recipient,
+        uint256, // amount is used only for multicall
+        string memory _message
+    ) external payable override {
+        uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
+        (, uint256 paymentValue) = _splitPayment(msgValue, AssetType.Coin);
         _sendCoin(_recipient, paymentValue);
 
         emit TipMessage(_recipient, _message, msg.sender, address(0));
@@ -80,7 +86,8 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 
         string memory _message
     ) external payable override {
         // we use it just to revert when value is too small
-        _splitPayment(msg.value, AssetType.NFT);
+        uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
+        _splitPayment(msgValue, AssetType.NFT);
 
         _sendNFTAsset(_tokenId, msg.sender, _recipient, _nftContractAddress);
 
@@ -98,7 +105,8 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 
         string memory _message
     ) external payable override {
         // we use it just to revert when value is too small
-        _splitPayment(msg.value, AssetType.ERC1155);
+        uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
+        _splitPayment(msgValue, AssetType.ERC1155);
 
         _sendERC1155Asset(_assetId, _amount, msg.sender, _recipient, _assetContractAddress);
 
@@ -152,6 +160,42 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, IERC165 
         onlyOwner
     {
         admins[_adminAddress] = false;
+    }
+
+    /**
+    * @notice This is a function that allows for multicall
+    * @param _calls An array of inputs for each call.
+    * @dev calls Batchable::callBatch
+    */
+    function batch(bytes[] calldata _calls) external payable {
+        batchCall(_calls);
+    }
+
+    function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
+        return
+            _selector == this.sendTo.selector ||
+            _selector == this.sendTokenTo.selector ||
+            _selector == this.sendERC721To.selector ||
+            _selector == this.sendERC1155To.selector
+        ;
+    }
+
+    function calculateMsgValueForACall(bytes4 _selector, bytes memory _calldata) override view internal returns (uint256) {
+        uint256 currentCallPriceAmount;
+
+        if (_selector == this.sendTo.selector) {
+            assembly {
+                currentCallPriceAmount := mload(add(_calldata, 68))
+            }
+        } else if (_selector == this.sendTokenTo.selector) {
+            currentCallPriceAmount = getPaymentFee(0, AssetType.Token);
+        } else if (_selector == this.sendTokenTo.selector) {
+            currentCallPriceAmount = getPaymentFee(0, AssetType.NFT);
+        } else {
+            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC1155);
+        }
+
+        return currentCallPriceAmount;
     }
 
     /*

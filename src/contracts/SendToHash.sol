@@ -20,6 +20,7 @@ import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 import { ConversionUtils } from "./libs/ConversionUtils.sol";
 import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
 import { FeeCalculator } from "./libs/FeeCalculator.sol";
+import { Batchable } from "./libs/Batchable.sol";
 
 
 /**
@@ -27,7 +28,9 @@ import { FeeCalculator } from "./libs/FeeCalculator.sol";
  * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @notice This contract is used to pay to the IDriss address without a need for it to be registered
  */
-contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, FeeCalculator, IERC721Receiver, IERC165, IERC1155Receiver {
+contract SendToHash is
+                ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender,
+                FeeCalculator, IERC721Receiver, IERC165, IERC1155Receiver, Batchable {
     using SafeCast for int256;
 
     // payer => beneficiaryHash => assetType => assetAddress => AssetLiability
@@ -42,11 +45,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, 
     address public immutable IDRISS_ADDR;
     uint256 public paymentFeesBalance;
 
-    uint256 private _MSG_VALUE;
-    uint256 private constant _BATCH_NOT_ENTERED = 1;
-    uint256 private constant _BATCH_ENTERED = 2;
-    uint256 private _batchStatus;
-
     event AssetTransferred(bytes32 indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount, AssetType assetType, string message);
     event AssetMoved(bytes32 indexed fromHash, bytes32 indexed toHash,
@@ -56,14 +54,10 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, 
     event AssetTransferReverted(bytes32 indexed toHash, address indexed from,
         address indexed assetContractAddress, uint256 amount, AssetType assetType);
 
-    error BatchError(bytes innerError);
-
     constructor(address _IDrissAddr, address _maticUsdAggregator) FeeCalculator(_maticUsdAggregator) {
         _checkNonZeroAddress(_IDrissAddr, "IDriss address cannot be 0");
 
         IDRISS_ADDR = _IDrissAddr;
-
-        _batchStatus = _BATCH_NOT_ENTERED;
 
         FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.PercentageOrConstantMaximum;
         FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Constant;
@@ -346,67 +340,32 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, 
     }
 
     /**
-    * @notice This function allows batched call to self (this contract).
-    * @dev This is BoringBatchable based function with a small twist: because delgatecall passes msg.value
-    *      on each call, it may introduce double spending issue. To avoid that, we handle cases when msg.value matters separately.
-    *      Please note that you'll have to pass msg.value in amount field for native currency per each call
-    *      Additionally, please keep in mind that currently you cannot put payable and nonpayable calls in the same batch -
-    *      - nonpayable functions will revert when receiving money
-    * @param calls An array of inputs for each call.
+    * @notice This is a function that allows for multicall
+    * @param _calls An array of inputs for each call.
+    * @dev calls Batchable::batchCall
     */
-    // F1: External is ok here because this is the batch function, adding it to a batch makes no sense
-    // F2: Calls in the batch may be payable, delegatecall operates in the same context, so each call in the batch has access to msg.value
-    // C3: The length of the loop is fully under user control, so can't be exploited
-    // C7: Delegatecall is used on the same contract, and there is reentrancy guard in place
-    function batch(bytes[] calldata calls) external payable {
-        // bacause we already have reentrancy guard for functions, we set second kind of reentrancy guard
-        require(_batchStatus != _BATCH_ENTERED, "ReentrancyGuard: reentrant call");
-        uint256 msgValueSentAcc;
+    function batch(bytes[] calldata _calls) external payable {
+        batchCall(_calls);
+    }
 
-        _batchStatus = _BATCH_ENTERED;
+    function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
+        return _selector == this.sendToAnyone.selector;
+    }
 
-        for (uint256 i = 0; i < calls.length; i++) {
-            bool success;
-            bytes memory result;
-            bytes memory _data = calls[i];
-            bytes4 sig;
+    function calculateMsgValueForACall(bytes4, bytes memory _calldata) override view internal returns (uint256) {
+        uint256 currentCallPriceAmount;
+        AssetType assetType;
 
-            assembly {
-                sig := mload(add(_data, add(0x20, 0)))
-            }
-
-            // set proper msg.value for payable function, as delegatecall can introduce double spending
-            if (sig == this.sendToAnyone.selector) {
-                uint256 currentCallPriceAmount;
-                AssetType assetType;
-
-                assembly {
-                    currentCallPriceAmount := mload(add(_data, 68))
-                    assetType := mload(add(_data, 100))
-                }
-
-                if (assetType != AssetType.Coin) {
-                    currentCallPriceAmount = getPaymentFee(0, assetType);
-                }
-
-                _MSG_VALUE = currentCallPriceAmount;
-                msgValueSentAcc += currentCallPriceAmount;
-
-                require (msgValueSentAcc <= msg.value, "Can't send more than msg.value");
-
-                (success, result) = address(this).delegatecall(calls[i]);
-
-                _MSG_VALUE = 0;
-            } else {
-                (success, result) = address(this).delegatecall(calls[i]);
-            }
-
-            if (!success) {
-                _getRevertMsg(result);
-            }
+        assembly {
+            currentCallPriceAmount := mload(add(_calldata, 68))
+            assetType := mload(add(_calldata, 100))
         }
 
-        _batchStatus = _BATCH_NOT_ENTERED;
+        if (assetType != AssetType.Coin) {
+            currentCallPriceAmount = getPaymentFee(0, assetType);
+        }
+
+        return currentCallPriceAmount;
     }
 
     /**
@@ -519,24 +478,6 @@ contract SendToHash is ISendToHash, Ownable, ReentrancyGuard, MultiAssetSender, 
         bytes memory
     ) public virtual override returns (bytes4) {
         return IERC1155Receiver.onERC1155BatchReceived.selector;
-    }
-
-    /**
-    * @notice This is part of BoringBatchable contract
-    *         https://github.com/boringcrypto/BoringSolidity/blob/master/contracts/BoringBatchable.sol
-    * @dev Helper function to extract a useful revert message from a failed call.
-    * If the returned data is malformed or not correctly abi encoded then this call can fail itself.
-    */
-    function _getRevertMsg(bytes memory _returnData) internal pure{
-        // If the _res length is less than 68, then
-        // the transaction failed with custom error or silently (without a revert message)
-        if (_returnData.length < 68) revert BatchError(_returnData);
-
-        assembly {
-            // Slice the sighash.
-            _returnData := add(_returnData, 0x04)
-        }
-        revert(abi.decode(_returnData, (string))); // All that remains is the revert string
     }
 
     function supportsInterface (bytes4 interfaceId) public pure override returns (bool) {

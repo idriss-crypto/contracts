@@ -1034,34 +1034,6 @@ describe('SendToHash contract', async () => {
              .to.be.revertedWith('Nothing to revert.')
       })
 
-      it ('properly handles batch send assets for multiple asset types', async () => {
-         const dollarInWei = await mockPriceOracle.dollarToWei()
-         const priceToSend = dollarInWei.add(1000)
-
-         await Promise.all([
-            mockToken.approve(sendToHash.address, 2000),
-            mockNFT.approve(sendToHash.address, 0),
-            mockERC1155.setApprovalForAll(sendToHash.address, true)
-         ])
-
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS, 0)).to.be.equal(0)
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address, 0)).to.be.equal(0)
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address, 0)).to.be.equal(0)
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 3)).to.be.equal(0)
-
-         await sendToHash.batch([
-            sendToAnyoneToBytes(signer1Hash, priceToSend, ASSET_TYPE_COIN),
-            sendToAnyoneToBytes(signer1Hash, 1, ASSET_TYPE_NFT, mockNFT.address, 0, ""),
-            sendToAnyoneToBytes(signer1Hash, 100, ASSET_TYPE_TOKEN, mockToken.address, 0, ""),
-            sendToAnyoneToBytes(signer1Hash, 4, ASSET_TYPE_ERC1155, mockERC1155.address, 3, "")
-         ], {value: dollarInWei.mul(3).add(priceToSend)})
-
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_COIN, ZERO_ADDRESS, 0)).to.be.equal(1000)
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_TOKEN, mockToken.address, 0)).to.be.equal(100)
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_NFT, mockNFT.address, 0)).to.be.equal(1)
-         expect(await sendToHash.balanceOf(signer1Hash, ASSET_TYPE_ERC1155, mockERC1155.address, 3)).to.be.equal(4)
-      })
-
       it ('handles batch revert properly', async () => {
          const dollarInWei = await mockPriceOracle.dollarToWei()
          const priceToSend = dollarInWei.add(1000)

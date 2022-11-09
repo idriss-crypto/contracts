@@ -1,6 +1,10 @@
 import '@nomiclabs/hardhat-waffle'
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
+import "@nomiclabs/hardhat-etherscan";
+import "hardhat-gas-reporter"
+import 'solidity-coverage'
+
 import 'dotenv/config'
 import crypto from 'crypto'
 
@@ -193,7 +197,10 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8545",
       allowUnlimitedContractSize: true,
     }
-  }
+  },
+  etherscan: {
+    apiKey: process.env.POLYGONSCAN_API_KEY
+  },
 }
 /**
  * @type import('hardhat/config').HardhatUserConfig
