@@ -47,13 +47,12 @@ abstract contract Batchable {
             bytes4 sig;
 
             assembly {
-//                sig := mload(add(data, add(0x20, 0)))
-                sig := add(data, 0x04)
+                sig := mload(add(data, add(0x20, 0)))
             }
 
             // set proper msg.value for payable function, as delegatecall can introduce double spending
             if (isMsgValueOverride(sig)) {
-                uint256 currentCallPriceAmount = calculateMsgValueForACall(data);
+                uint256 currentCallPriceAmount = calculateMsgValueForACall(sig, data);
 
                 _MSG_VALUE = currentCallPriceAmount;
                 msgValueSentAcc += currentCallPriceAmount;
@@ -94,8 +93,8 @@ abstract contract Batchable {
     }
 
     /**
-    * @notice Checks if a function is payable
-    * @param _calls An array of inputs for each call.
+    * @notice Checks if a function is payable, i.e. should _MSG_VALUE be set
+    * @param _selector function selector
     * @dev Write your logic checking if a function is payable, e.g. this.<function-name>.selector == _selector
     *      WARNING - if you, or someone else if able to construct the same selector for a malicious function (which is not that hard),
     *      the logic may break and the msg.value may be exploited
@@ -104,8 +103,9 @@ abstract contract Batchable {
 
     /**
     * @notice Calculates msg.value that should be sent with a call
+    * @param _selector function selector
     * @param _calldata single call encoded data
     * @dev You should probably decode function parameters and check what value should be passed
     */
-    function calculateMsgValueForACall(bytes memory _calldata) virtual view internal returns (uint256);
+    function calculateMsgValueForACall(bytes4 _selector, bytes memory _calldata) virtual view internal returns (uint256);
 }

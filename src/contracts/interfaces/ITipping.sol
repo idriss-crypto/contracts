@@ -6,7 +6,9 @@ import { AssetType } from "../enums/IDrissEnums.sol";
 interface ITipping {
     function sendTo(
         address _recipient,
-        string memory _message) external payable;
+        uint256 _amount,
+        string memory _message
+    ) external payable;
 
     function sendTokenTo(
         address _recipient,

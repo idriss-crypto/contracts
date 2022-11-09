@@ -342,17 +342,17 @@ contract SendToHash is
     /**
     * @notice This is a function that allows for multicall
     * @param _calls An array of inputs for each call.
-    * @dev Batchable::callBatch
+    * @dev calls Batchable::batchCall
     */
     function batch(bytes[] calldata _calls) external payable {
-        batchCall(calls);
+        batchCall(_calls);
     }
 
     function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
         return _selector == this.sendToAnyone.selector;
     }
 
-    function calculateMsgValueForACall(bytes memory _calldata) override view internal returns (uint256) {
+    function calculateMsgValueForACall(bytes4, bytes memory _calldata) override view internal returns (uint256) {
         uint256 currentCallPriceAmount;
         AssetType assetType;
 
