@@ -86,34 +86,6 @@ contract IDrissMappings {
         emit AdminDeleted(adminAddress);
     }
 
-    function setPrice(uint newPrice) external {
-        if (msg.sender != contractOwner) {
-            revert IDrissMappings__OnlyContractOwnerCanSetPrice();
-        }
-        price = newPrice;
-        emit NewPrice(price);
-    }
-
-    function withdraw() external returns (bytes memory) {
-        if (admins[msg.sender] != true) {
-            revert IDrissMappings__OnlyTrustedAdminCanWithdraw();
-        }
-        (bool sent, bytes memory data) = msg.sender.call{
-            value: address(this).balance,
-            gas: 40000
-        }("");
-        if(!sent) {revert IDrissMappings__FailedToWithdraw();}
-        return data;
-    }
-
-    function withdrawTokens(address tokenContract) external {
-        if (admins[msg.sender] != true) {
-            revert IDrissMappings__OnlyTrustedAdminCanWithdraw();
-        }
-        ERC20 tc = ERC20(tokenContract);
-        tc.transfer(msg.sender, tc.balanceOf(address(this)));
-    }
-
     function increment() private {
         countAdding += 1;
         emit Increment(countAdding);
@@ -129,7 +101,7 @@ contract IDrissMappings {
         string memory hashID,
         string memory address_,
         address ownerAddress
-    ) external payable {
+    ) external {
         if (admins[msg.sender] != true) {
             revert IDrissMappings__OnlyTrustedAdminCanAddIDriss();
         }
@@ -145,38 +117,7 @@ contract IDrissMappings {
         emit IDrissAdded(hashPub);
     }
 
-    function addIDrissToken(
-        string memory hashPub,
-        string memory hashID,
-        string memory address_,
-        address token,
-        uint amount,
-        address ownerAddress
-    ) external payable {
-        if (admins[msg.sender] != true) {
-            revert IDrissMappings__OnlyTrustedAdminCanAddIDriss();
-        }
-        if(keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes(""))) {
-            revert IDrissMappings__BindingAlreadyCreated();
-        }
-        ERC20 paymentTc = ERC20(token);
-        require(
-            paymentTc.allowance(msg.sender, address(this)) >= amount,
-            "Insuficient Allowance."
-        );
-        require(
-            paymentTc.transferFrom(msg.sender, address(this), amount),
-            "Transfer Failed."
-        );
-        IDriss[hashID] = address_;
-        IDrissHash[hashPub] = hashID;
-        IDrissOwners[hashPub] = ownerAddress;
-        payDates[hashPub] = block.timestamp;
-        increment();
-        emit IDrissAdded(hashPub);
-    }
-
-    function deleteIDriss(string memory hashPub) external payable {
+    function deleteIDriss(string memory hashPub) external {
         if (IDrissOwners[hashPub] != msg.sender) {
             revert IDrissMappings__OnlyIDrissOwnerCanDeleteBinding();
         }
@@ -204,7 +145,6 @@ contract IDrissMappings {
 
     function transferIDrissOwnership(string memory hashPub, address newOwner)
         external
-        payable
     {
         if (IDrissOwners[hashPub] != msg.sender) {
             revert IDrissMappings__OnlyIDrissOwnerCanChangeOwnership();
@@ -213,7 +153,7 @@ contract IDrissMappings {
         emit IDrissOwnershipTransferred(msg.sender, newOwner);
     }
 
-    function transferContractOwnership(address newOwner) public payable {
+    function transferContractOwnership(address newOwner) public {
         if (msg.sender != contractOwner) {
             revert IDrissMappings__OnlyContractOwnerCanChangeOwnership();
         }
