@@ -35,7 +35,7 @@ contract PublicGoodAttester {
         return
             _eas.attest(
                 AttestationRequest({
-                    schema: 0x20E35DD07C2DCEE57DC819AC38BD364B1F4D96FA7741A94CEA5D55BA658C23B5,
+                    schema: 0x28b73429cc730191053ba7fe21e17253be25dbab480f0c3a369de5217657d925,
                     data: AttestationRequestData({
                         recipient: msg.sender, // the supporter receives the attestation
                         expirationTime: NO_EXPIRATION_TIME, // No expiration time

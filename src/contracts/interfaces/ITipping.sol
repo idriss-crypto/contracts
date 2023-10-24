@@ -39,4 +39,5 @@ interface ITipping {
     function addAdmin(address _adminAddress) external;
 
     function deleteAdmin(address _adminAddress) external;
+
 }
