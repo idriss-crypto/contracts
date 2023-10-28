@@ -39,7 +39,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
         uint256 fee
     );
 
-    constructor(address _eas) PublicGoodAttester(_eas) {
+    constructor(address _eas, bytes32 _easSchema) PublicGoodAttester(_eas, _easSchema) {
         admins[msg.sender] = true;
 
         FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;

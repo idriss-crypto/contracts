@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
@@ -14,6 +14,8 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 contract MultiAssetSender {
 
     constructor() { }
+
+    using SafeERC20 for IERC20;
 
     /**
     * @notice Wrapper for sending native Coin via call function
@@ -99,8 +101,7 @@ contract MultiAssetSender {
     ) internal {
         IERC20 token = IERC20(_contractAddress);
 
-        bool sent = token.transfer(_to, _amount);
-        require(sent, "Failed to transfer token");
+        token.safeTransfer(_to, _amount);
     }
 
     /**
@@ -114,7 +115,6 @@ contract MultiAssetSender {
     ) internal {
         IERC20 token = IERC20(_contractAddress);
 
-        bool sent = token.transferFrom(_from, _to, _amount);
-        require(sent, "Failed to transfer token");
+        token.safeTransferFrom(_from, _to, _amount);
     }
 }

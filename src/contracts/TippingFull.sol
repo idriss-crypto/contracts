@@ -39,7 +39,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         uint256 fee
     );
 
-    constructor(address _nativeUsdAggregator, address _eas) FeeCalculator(_nativeUsdAggregator) PublicGoodAttester(_eas) {
+    constructor(address _nativeUsdAggregator, address _eas, bytes32 _easSchema) FeeCalculator(_nativeUsdAggregator) PublicGoodAttester(_eas, _easSchema) {
         admins[msg.sender] = true;
 
         FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
