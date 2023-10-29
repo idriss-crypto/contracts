@@ -79,18 +79,19 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         address _tokenContractAddr,
         string memory _message
     ) external payable override {
+        uint256 amountIn =  _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
+
         uint256 paymentValue;
         if (publicGoods[_recipient]) {
-            paymentValue = _amount;
+            paymentValue = amountIn;
             _attestDonor(_recipient);
         } else {
-            (, paymentValue) = _splitPayment(_amount, AssetType.Token);
+            (, paymentValue) = _splitPayment(amountIn, AssetType.Token);
         }
 
-        _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
         _sendTokenAsset(paymentValue, _recipient, _tokenContractAddr);
 
-        emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr, paymentValue, _amount-paymentValue);
+        emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr, paymentValue, amountIn-paymentValue);
     }
 
     /**

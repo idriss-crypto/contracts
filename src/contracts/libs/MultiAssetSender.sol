@@ -98,10 +98,15 @@ contract MultiAssetSender {
         uint256 _amount,
         address _to,
         address _contractAddress
-    ) internal {
+    ) internal returns (uint256) {
         IERC20 token = IERC20(_contractAddress);
 
+        uint256 balanceBefore = token.balanceOf(_to);
+
         token.safeTransfer(_to, _amount);
+
+        uint256 balanceAfter = token.balanceOf(_to);
+        return (balanceAfter - balanceBefore);
     }
 
     /**
@@ -112,9 +117,14 @@ contract MultiAssetSender {
         address _from,
         address _to,
         address _contractAddress
-    ) internal {
+    ) internal returns (uint256) {
         IERC20 token = IERC20(_contractAddress);
 
+        uint256 balanceBefore = token.balanceOf(_to);
+
         token.safeTransferFrom(_from, _to, _amount);
+
+        uint256 balanceAfter = token.balanceOf(_to);
+        return (balanceAfter - balanceBefore);
     }
 }
