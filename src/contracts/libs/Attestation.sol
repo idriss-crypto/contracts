@@ -31,22 +31,20 @@ contract PublicGoodAttester {
     /**
      * @dev Attests to a schema that receives parameter
      * @param _publicGood: recipient address of public good
-     * @return The UID of the new attestation.
      */
-    function _attestDonor(address _publicGood) internal returns (bytes32) {
-        return
-            EAS.attest(
-                AttestationRequest({
-                    schema: EAS_SCHEMA,
-                    data: AttestationRequestData({
-                        recipient: msg.sender, // the supporter receives the attestation
-                        expirationTime: NO_EXPIRATION_TIME, // No expiration time
-                        revocable: false,
-                        refUID: EMPTY_UID, // No references UI
-                        data: abi.encode(_publicGood), // Encode grantee address
-                        value: 0 // No value/ETH
-                    })
+    function _attestDonor(address _publicGood) internal {
+        EAS.attest(
+            AttestationRequest({
+                schema: EAS_SCHEMA,
+                data: AttestationRequestData({
+                    recipient: msg.sender, // the supporter receives the attestation
+                    expirationTime: NO_EXPIRATION_TIME, // No expiration time
+                    revocable: false,
+                    refUID: EMPTY_UID, // No references UI
+                    data: abi.encode(_publicGood), // Encode grantee address
+                    value: 0 // No value/ETH
                 })
-            );
+            })
+        );
     }
 }
