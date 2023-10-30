@@ -4,7 +4,8 @@ pragma solidity 0.8.19;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
@@ -47,6 +48,8 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
+
+    using SafeERC20 for IERC20;
 
     /**
      * @notice Send native currency tip, charging a small fee
@@ -155,7 +158,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         onlyAdminCanWithdraw
     {
         IERC20 withdrawTC = IERC20(_tokenContract);
-        withdrawTC.transfer(msg.sender, withdrawTC.balanceOf(address(this)));
+        withdrawTC.safeTransfer(msg.sender, withdrawTC.balanceOf(address(this)));
     }
 
     /**
