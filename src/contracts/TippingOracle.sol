@@ -41,7 +41,7 @@ contract TippingOracle is Ownable, ITipping, MultiAssetSender, FeeCalculator, Ba
     constructor(address _nativeUsdAggregator) FeeCalculator(_nativeUsdAggregator) {
         admins[msg.sender] = true;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
@@ -60,7 +60,7 @@ contract TippingOracle is Ownable, ITipping, MultiAssetSender, FeeCalculator, Ba
         if (publicGoods[_recipient]) {
             paymentValue = msgValue;
         } else {
-            (, paymentValue) = _splitPayment(msgValue, AssetType.Coin);
+            (, paymentValue) = _splitPayment(msgValue, AssetType.Native);
         }
 
         _sendCoin(_recipient, paymentValue);

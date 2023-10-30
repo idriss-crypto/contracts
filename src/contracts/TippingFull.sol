@@ -46,7 +46,7 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
     constructor(address _nativeUsdAggregator, address _eas, bytes32 _easSchema) FeeCalculator(_nativeUsdAggregator) PublicGoodAttester(_eas, _easSchema) {
         admins[msg.sender] = true;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
@@ -68,7 +68,7 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
             paymentValue = msgValue;
             _attestDonor(_recipient);
         } else {
-            (, paymentValue) = _splitPayment(msgValue, AssetType.Coin);
+            (, paymentValue) = _splitPayment(msgValue, AssetType.Native);
         }
 
         _sendCoin(_recipient, paymentValue);

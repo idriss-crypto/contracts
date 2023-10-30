@@ -42,7 +42,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
     constructor(address _eas, bytes32 _easSchema) PublicGoodAttester(_eas, _easSchema) {
         admins[msg.sender] = true;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
@@ -62,7 +62,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
             paymentValue = msgValue;
             _attestDonor(_recipient);
         } else {
-            (, paymentValue) = _splitPayment(msgValue, AssetType.Coin);
+            (, paymentValue) = _splitPayment(msgValue, AssetType.Native);
         }
 
         _sendCoin(_recipient, paymentValue);

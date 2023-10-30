@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 enum AssetType {
-    Coin,
+    Native,
     Token,
     NFT,
     ERC1155

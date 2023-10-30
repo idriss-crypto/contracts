@@ -38,7 +38,7 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
     constructor(address _maticUsdAggregator) FeeCalculator(_maticUsdAggregator) {
         admins[msg.sender] = true;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
@@ -53,7 +53,7 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
         string memory _message
     ) external payable override {
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
-        (, uint256 paymentValue) = _splitPayment(msgValue, AssetType.Coin);
+        (, uint256 paymentValue) = _splitPayment(msgValue, AssetType.Native);
         _sendCoin(_recipient, paymentValue);
 
         emit TipMessage(_recipient, _message, msg.sender, address(0));

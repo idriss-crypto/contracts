@@ -59,7 +59,7 @@ contract SendToHash is
 
         IDRISS_ADDR = _IDrissAddr;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.PercentageOrConstantMaximum;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.PercentageOrConstantMaximum;
         FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
@@ -83,7 +83,7 @@ contract SendToHash is
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
         (uint256 fee, uint256 paymentValue) = _splitPayment(msgValue, _assetType);
-        if (_assetType != AssetType.Coin) { fee = msgValue; }
+        if (_assetType != AssetType.Native) { fee = msgValue; }
         if (_assetType == AssetType.Token || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
         if (_assetType == AssetType.NFT) { paymentValue = 1; }
 
@@ -116,7 +116,7 @@ contract SendToHash is
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability storage payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
 
-        if (_assetType == AssetType.Coin) {
+        if (_assetType == AssetType.Native) {
             _checkNonZeroValue(_amount, "Transferred value has to be bigger than 0");
         } else {
             _checkNonZeroValue(_amount, "Asset amount has to be bigger than 0");
@@ -192,7 +192,7 @@ contract SendToHash is
 
         delete beneficiaryAssetMap[hashWithPassword][_assetType][adjustedAssetAddress];
 
-        if (_assetType == AssetType.Coin) {
+        if (_assetType == AssetType.Native) {
             _sendCoin(ownerIDrissAddr, amountToClaim);
         } else if (_assetType == AssetType.Token) {
             _sendTokenAsset(amountToClaim, ownerIDrissAddr, _assetContractAddress);
@@ -247,7 +247,7 @@ contract SendToHash is
         // has to be invoked after all reads required by this function, as it modifies state
         uint256 amountToRevert = setStateForRevertPayment(_IDrissHash, _assetType, _assetContractAddress);
 
-        if (_assetType == AssetType.Coin) {
+        if (_assetType == AssetType.Native) {
             _sendCoin(msg.sender, amountToRevert);
         } else if (_assetType == AssetType.Token) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
@@ -361,7 +361,7 @@ contract SendToHash is
             assetType := mload(add(_calldata, 100))
         }
 
-        if (assetType != AssetType.Coin) {
+        if (assetType != AssetType.Native) {
             currentCallPriceAmount = getPaymentFee(0, assetType);
         }
 
@@ -398,7 +398,7 @@ contract SendToHash is
         internal
         pure
         returns (address) {
-            if (_assetType == AssetType.Coin) {
+            if (_assetType == AssetType.Native) {
                 return address(0);
             }
             return _addr;
