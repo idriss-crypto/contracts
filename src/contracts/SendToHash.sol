@@ -60,7 +60,7 @@ contract SendToHash is
         IDRISS_ADDR = _IDrissAddr;
 
         FEE_TYPE_MAPPING[AssetType.Native] = FeeType.PercentageOrConstantMaximum;
-        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
@@ -84,12 +84,12 @@ contract SendToHash is
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
         (uint256 fee, uint256 paymentValue) = _splitPayment(msgValue, _assetType);
         if (_assetType != AssetType.Native) { fee = msgValue; }
-        if (_assetType == AssetType.Token || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
+        if (_assetType == AssetType.ERC20 || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
         if (_assetType == AssetType.NFT) { paymentValue = 1; }
 
         setStateForSendToAnyone(_IDrissHash, paymentValue, fee, _assetType, _assetContractAddress, _assetId);
 
-        if (_assetType == AssetType.Token) {
+        if (_assetType == AssetType.ERC20) {
             _sendTokenAssetFrom(paymentValue, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAsset(_assetId, msg.sender, address(this), _assetContractAddress);
@@ -194,7 +194,7 @@ contract SendToHash is
 
         if (_assetType == AssetType.Native) {
             _sendCoin(ownerIDrissAddr, amountToClaim);
-        } else if (_assetType == AssetType.Token) {
+        } else if (_assetType == AssetType.ERC20) {
             _sendTokenAsset(amountToClaim, ownerIDrissAddr, _assetContractAddress);
         }
 
@@ -249,7 +249,7 @@ contract SendToHash is
 
         if (_assetType == AssetType.Native) {
             _sendCoin(msg.sender, amountToRevert);
-        } else if (_assetType == AssetType.Token) {
+        } else if (_assetType == AssetType.ERC20) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.NFT) {
             _sendNFTAssetBatch(assetIds, address(this), msg.sender, _assetContractAddress);

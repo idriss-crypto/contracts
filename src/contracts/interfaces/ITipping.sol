@@ -10,7 +10,7 @@ interface ITipping {
         string memory _message
     ) external payable;
 
-    function sendTokenTo(
+    function sendERC20To(
         address _recipient,
         uint256 _amount,
         address _tokenContractAddr,

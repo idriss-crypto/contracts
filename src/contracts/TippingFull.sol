@@ -47,7 +47,7 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
         admins[msg.sender] = true;
 
         FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
-        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
@@ -79,7 +79,7 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
     /**
      * @notice Send a tip in ERC20 token, charging a small fee
      */
-    function sendTokenTo(
+    function sendERC20To(
         address _recipient,
         uint256 _amount,
         address _tokenContractAddr,
@@ -92,7 +92,7 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
             paymentValue = amountIn;
             _attestDonor(_recipient);
         } else {
-            (, paymentValue) = _splitPayment(amountIn, AssetType.Token);
+            (, paymentValue) = _splitPayment(amountIn, AssetType.ERC20);
         }
 
         _sendTokenAsset(paymentValue, _recipient, _tokenContractAddr);
@@ -215,7 +215,7 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
     function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
         return
             _selector == this.sendNativeTo.selector ||
-            _selector == this.sendTokenTo.selector ||
+            _selector == this.sendERC20To.selector ||
             _selector == this.sendERC721To.selector ||
             _selector == this.sendERC1155To.selector
         ;
@@ -228,8 +228,8 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
             assembly {
                 currentCallPriceAmount := mload(add(_calldata, 68))
             }
-        } else if (_selector == this.sendTokenTo.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.Token);
+        } else if (_selector == this.sendERC20To.selector) {
+            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC20);
         } else if (_selector == this.sendERC721To.selector) {
             currentCallPriceAmount = getPaymentFee(0, AssetType.NFT);
         } else if (_selector == this.sendERC1155To.selector) {

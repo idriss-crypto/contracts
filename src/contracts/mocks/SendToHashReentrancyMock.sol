@@ -43,7 +43,7 @@ contract SendToHashReentrancyMock {
 
     //ERC20 - overrides ERC20 function
     function transfer(address, uint256) external returns (bool) {
-        _sendToAnyoneReentrancy(AssetType.Token);
+        _sendToAnyoneReentrancy(AssetType.ERC20);
 
         return true;
     }
@@ -54,7 +54,7 @@ contract SendToHashReentrancyMock {
         address,
         uint256
     ) external returns (bool) {
-        _sendToAnyoneReentrancy(AssetType.Token);
+        _sendToAnyoneReentrancy(AssetType.ERC20);
 
         return true;
     }

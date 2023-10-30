@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 enum AssetType {
     Native,
-    Token,
+    ERC20,
     NFT,
     ERC1155
 }
