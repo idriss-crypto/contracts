@@ -78,6 +78,10 @@ contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, Fe
 
     /**
      * @notice Send a tip in ERC20 token, charging a small fee
+     * @notice Please note that this protocol does not support tokens with
+     *         non-standard ERC20 interfaces and functionality,
+     *         such as tokens with rebasing functionality.
+     *         Usage of such tokens may result in a loss of assets.
      */
     function sendERC20To(
         address _recipient,
