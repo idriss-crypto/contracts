@@ -99,15 +99,10 @@ contract MultiAssetSender {
         uint256 _amount,
         address _to,
         address _contractAddress
-    ) internal returns (uint256) {
+    ) internal {
         IERC20 token = IERC20(_contractAddress);
 
-        uint256 balanceBefore = token.balanceOf(_to);
-
         token.safeTransfer(_to, _amount);
-
-        uint256 balanceAfter = token.balanceOf(_to);
-        return (balanceAfter - balanceBefore);
     }
 
     /**
