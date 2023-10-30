@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import { AssetType } from "../enums/IDrissEnums.sol";
 
 interface ITipping {
-    function sendTo(
+    function sendNativeTo(
         address _recipient,
         uint256 _amount,
         string memory _message

@@ -51,7 +51,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
     /**
      * @notice Send native currency tip, charging a small fee
      */
-    function sendTo(
+    function sendNativeTo(
         address _recipient,
         uint256, // amount is used only for multicall
         string memory _message
@@ -204,7 +204,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
 
     function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
         return
-            _selector == this.sendTo.selector ||
+            _selector == this.sendNativeTo.selector ||
             _selector == this.sendTokenTo.selector ||
             _selector == this.sendERC721To.selector ||
             _selector == this.sendERC1155To.selector
@@ -214,7 +214,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
     function calculateMsgValueForACall(bytes4 _selector, bytes memory _calldata) override view internal returns (uint256) {
         uint256 currentCallPriceAmount;
 
-        if (_selector == this.sendTo.selector) {
+        if (_selector == this.sendNativeTo.selector) {
             assembly {
                 currentCallPriceAmount := mload(add(_calldata, 68))
             }
