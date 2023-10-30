@@ -9,13 +9,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
 
 /**
- * @title FeeCalculator
+ * @title FeeCalculatorSimple
  * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @custom:contributor Lennard (levertz)
  * @notice This is an utility contract for calculating a fee
  * @notice In this simlified version, we don't use (chainlink) oracles, but a constant (adjustable) fee
  */
-contract FeeCalculator is Ownable {
+contract FeeCalculatorSimple is Ownable {
     uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
     uint256 public PAYMENT_FEE_PERCENTAGE = 10;
     uint256 public PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;

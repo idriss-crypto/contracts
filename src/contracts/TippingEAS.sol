@@ -10,7 +10,7 @@ import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 import { ITipping } from "./interfaces/ITipping.sol";
 import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
-import { FeeCalculator } from "./libs/FeeCalculatorSimple.sol";
+import { FeeCalculatorSimple } from "./libs/FeeCalculatorSimple.sol";
 import { PublicGoodAttester } from "./libs/Attestation.sol";
 import { Batchable } from "./libs/Batchable.sol";
 
@@ -26,7 +26,7 @@ error unknown_function_selector();
  * @notice Tipping is a helper smart contract used for IDriss social media tipping functionality
  * @notice This contract features Public Good Attestations but no oracles for fee calculation
  */
-contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, PublicGoodAttester, Batchable, IERC165 {
+contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculatorSimple, PublicGoodAttester, Batchable, IERC165 {
     mapping(address => bool) public admins;
     mapping(address => bool) public publicGoods;
 
