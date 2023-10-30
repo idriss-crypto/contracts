@@ -44,7 +44,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
 
         FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
         FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Percentage;
-        FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.ERC721] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
 
@@ -104,7 +104,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
     ) external payable override {
         // we use it just to revert when value is too small
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
-        (uint256 fee,) = _splitPayment(msgValue, AssetType.NFT);
+        (uint256 fee,) = _splitPayment(msgValue, AssetType.ERC721);
 
         _sendNFTAsset(_tokenId, msg.sender, _recipient, _nftContractAddress);
 
@@ -221,7 +221,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
         } else if (_selector == this.sendERC20To.selector) {
             currentCallPriceAmount = getPaymentFee(0, AssetType.ERC20);
         } else if (_selector == this.sendERC721To.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.NFT);
+            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC721);
         } else if (_selector == this.sendERC1155To.selector) {
             currentCallPriceAmount = getPaymentFee(0, AssetType.ERC1155);
         } else {

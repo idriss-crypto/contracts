@@ -38,7 +38,7 @@ contract SendToHashReentrancyMock {
         uint256,
         bytes calldata
     ) external {
-        _sendToAnyoneReentrancy(AssetType.NFT);
+        _sendToAnyoneReentrancy(AssetType.ERC721);
     }
 
     //ERC20 - overrides ERC20 function
