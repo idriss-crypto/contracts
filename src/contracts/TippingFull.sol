@@ -5,7 +5,6 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
@@ -17,6 +16,10 @@ import { Batchable } from "./libs/Batchable.sol";
 
 import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+
 error tipping__withdraw__OnlyAdminCanWithdraw();
 error unknown_function_selector();
 
@@ -27,7 +30,7 @@ error unknown_function_selector();
  * @notice Tipping is a helper smart contract used for IDriss social media tipping functionality
  * @notice This contract features Public Good Attestations and Chainlink oracles for fee calculation
  */
-contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, PublicGoodAttester, Batchable, IERC165 {
+contract TippingFull is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, FeeCalculator, PublicGoodAttester, Batchable, IERC165 {
     mapping(address => bool) public admins;
     mapping(address => bool) public publicGoods;
 
@@ -58,7 +61,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         address _recipient,
         uint256, // amount is used only for multicall
         string memory _message
-    ) external payable override {
+    ) external payable override nonReentrant {
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
         uint256 paymentValue;
         if (publicGoods[_recipient]) {
@@ -81,7 +84,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         uint256 _amount,
         address _tokenContractAddr,
         string memory _message
-    ) external payable override {
+    ) external payable override nonReentrant {
         uint256 amountIn =  _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
 
         uint256 paymentValue;
@@ -105,7 +108,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         uint256 _tokenId,
         address _nftContractAddress,
         string memory _message
-    ) external payable override {
+    ) external payable override nonReentrant {
         // we use it just to revert when value is too small
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
         (uint256 fee,) = _splitPayment(msgValue, AssetType.NFT);
@@ -124,7 +127,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         uint256 _amount,
         address _assetContractAddress,
         string memory _message
-    ) external payable override {
+    ) external payable override nonReentrant {
         // we use it just to revert when value is too small
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
         (uint256 fee,) = _splitPayment(msgValue, AssetType.ERC1155);
@@ -137,7 +140,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
     /**
      * @notice Withdraw native currency transfer fees
      */
-    function withdraw() external override onlyAdminCanWithdraw {
+    function withdraw() external override onlyAdminCanWithdraw nonReentrant {
         (bool success, ) = msg.sender.call{value: address(this).balance}("");
         require(success, "Failed to withdraw.");
     }
@@ -156,6 +159,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         external
         override
         onlyAdminCanWithdraw
+        nonReentrant
     {
         IERC20 withdrawTC = IERC20(_tokenContract);
         withdrawTC.safeTransfer(msg.sender, withdrawTC.balanceOf(address(this)));
@@ -168,6 +172,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         external
         override
         onlyOwner
+        nonReentrant
     {
         admins[_adminAddress] = true;
     }
@@ -179,6 +184,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
         external
         override
         onlyOwner
+        nonReentrant
     {
         admins[_adminAddress] = false;
     }
@@ -186,14 +192,14 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
     /**
      * @notice Add public goods address with priviledged fee structure
      */
-    function addPublicGood(address publicGoodAddress) external onlyOwner {
+    function addPublicGood(address publicGoodAddress) external onlyOwner nonReentrant {
         publicGoods[publicGoodAddress] = true;
     }
 
     /**
      * @notice Remove public goods address
      */
-    function deletePublicGood(address publicGoodAddress) external onlyOwner {
+    function deletePublicGood(address publicGoodAddress) external onlyOwner nonReentrant {
         delete publicGoods[publicGoodAddress];
     }
 
@@ -202,7 +208,7 @@ contract TippingFull is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publ
     * @param _calls An array of inputs for each call.
     * @dev calls Batchable::callBatch
     */
-    function batch(bytes[] calldata _calls) external payable {
+    function batch(bytes[] calldata _calls) external payable nonReentrant {
         batchCall(_calls);
     }
 
