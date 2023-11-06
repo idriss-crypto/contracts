@@ -53,7 +53,6 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculatorSimple,
      */
     function sendNativeTo(
         address _recipient,
-        uint256, // amount is used only for multicall
         string memory _message
     ) external payable override {
         uint256 paymentValue;

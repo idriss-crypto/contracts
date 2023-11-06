@@ -49,7 +49,6 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
      */
     function sendNativeTo(
         address _recipient,
-        uint256, // amount is used only for multicall
         string memory _message
     ) external payable override {
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
