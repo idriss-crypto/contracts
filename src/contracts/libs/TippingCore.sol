@@ -7,9 +7,8 @@ import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 import { ITipping } from "../interfaces/ITipping.sol";
 import { MultiAssetSender } from "./MultiAssetSender.sol";
-import { FeeCalculator } from "./FeeCalculator.sol";
+import { FeeCalculatorNew } from "./FeeCalculatorNew.sol";
 import { PublicGoodAttester } from "./Attestation.sol";
-import { Batchable } from "./Batchable.sol";
 
 import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
 
@@ -19,12 +18,34 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 error OnlyAdminCanWithdraw();
 error UnknownFunctionSelector();
+error WithdrawFailed();
 
-abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetSender, FeeCalculator, Batchable {
+
+/**
+ * @title TippingCore
+ * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
+ * @custom:contributor Lennard <@lennardevertz>
+ * @notice This is an IDriss Send utility contract for all supported chains.
+ */
+abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, MultiAssetSender, FeeCalculatorNew {
+
     mapping(address => bool) public admins;
     mapping(address => bool) public publicGoods;
 
     using SafeERC20 for IERC20;
+
+    constructor(
+        address _nativeUsdAggregator,
+        address _eas,
+        bytes32 _easSchema
+    ) FeeCalculatorNew(_nativeUsdAggregator) PublicGoodAttester(_eas, _easSchema) {
+        admins[msg.sender] = true;
+
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC721] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
+    }
 
     event TipMessage(
         address indexed recipientAddress,
@@ -43,7 +64,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetS
     }
 
     /**
-     * Abstract methods to be overwritten
+     * Abstract functions to be overwritten
     */
 
     function _beforeTransfer(
@@ -62,14 +83,16 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetS
         address _assetContractAddress
         ) internal virtual;
 
+    function _getMinimumFee() internal virtual override view returns (uint256);
 
     /**
-     * Tipping methods
+     * Tipping functions
     */
-
 
     /**
      * @notice Send native currency tip, charging a small fee
+     * @param _recipient The address of the recipient of the tip
+     * @param _message The message accompanying the tip
      */
     function sendNativeTo(
         address _recipient,
@@ -87,9 +110,13 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetS
     /**
      * @notice Send a tip in ERC20 token, charging a small fee
      * @notice Please note that this protocol does not support tokens with
-     *         non-standard ERC20 interfaces and functionality,
-     *         such as tokens with rebasing functionality.
-     *         Usage of such tokens may result in a loss of assets.
+     * non-standard ERC20 interfaces and functionality,
+     * such as tokens with rebasing functionality.
+     * Usage of such tokens may result in a loss of assets.
+     * @param _recipient The address of the recipient of the tip
+     * @param _amount The amount of the ERC20 token being sent as a tip
+     * @param _tokenContractAddr The address of the ERC20 token contract
+     * @param _message The message accompanying the tip
      */
     function sendERC20To(
         address _recipient,
@@ -109,7 +136,11 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetS
     }
 
     /**
-     * @notice Send a tip in ERC721 token, charging a small $ fee
+     * @notice Send a tip in ERC721 token, charging a small fee
+     * @param _recipient The address of the recipient of the tip
+     * @param _tokenId The ID of the ERC721 token being sent as a tip
+     * @param _nftContractAddress The address of the ERC721 token contract
+     * @param _message The message accompanying the tip
      */
     function sendERC721To(
         address _recipient,
@@ -128,7 +159,12 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetS
     }
 
     /**
-     * @notice Send a tip in ERC1155 token, charging a small $ fee
+     * @notice Send a tip in ERC1155 token, charging a small fee
+     * @param _recipient The address of the recipient of the tip
+     * @param _assetId The ID of the ERC1155 token being sent as a tip
+     * @param _amount The amount of the ERC1155 token being sent as a tip
+     * @param _assetContractAddress The address of the ERC1155 token contract
+     * @param _message The message accompanying the tip
      */
     function sendERC1155To(
         address _recipient,
@@ -150,27 +186,6 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetS
     /**
      * Trusted admin methods
     */
-
-    /**
-     * @notice Withdraw native currency transfer fees
-     */
-    function withdraw() external override onlyAdminCanWithdraw nonReentrant {
-        (bool success, ) = msg.sender.call{value: address(this).balance}("");
-        require(success, "Failed to withdraw.");
-    }
-
-    /**
-     * @notice Withdraw ERC20 transfer fees
-     */
-    function withdrawToken(address _tokenContract)
-        external
-        override
-        onlyAdminCanWithdraw
-        nonReentrant
-    {
-        IERC20 withdrawTC = IERC20(_tokenContract);
-        withdrawTC.safeTransfer(msg.sender, withdrawTC.balanceOf(address(this)));
-    }
 
     /**
      * @notice Add admin with privileged access
@@ -211,45 +226,26 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, ITipping, MultiAssetS
     }
 
     /**
-     * Batch methods -> delete
-    */
+     * @notice Withdraw native currency transfer fees
+     */
+    function withdraw() external override onlyAdminCanWithdraw nonReentrant {
+        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        if (!success) {
+            revert WithdrawFailed();
+        }
+    }
 
     /**
-    * @notice This is a function that allows for multicall
-    * @param _calls An array of inputs for each call.
-    * @dev calls Batchable::callBatch
-    */
-    function batch(bytes[] calldata _calls) external payable nonReentrant {
-        batchCall(_calls);
-    }
-
-    function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
-        return
-            _selector == this.sendNativeTo.selector ||
-            _selector == this.sendERC20To.selector ||
-            _selector == this.sendERC721To.selector ||
-            _selector == this.sendERC1155To.selector
-        ;
-    }
-
-    function calculateMsgValueForACall(bytes4 _selector, bytes memory _calldata) override view internal returns (uint256) {
-        uint256 currentCallPriceAmount;
-
-        if (_selector == this.sendNativeTo.selector) {
-            assembly {
-                currentCallPriceAmount := mload(add(_calldata, 68))
-            }
-        } else if (_selector == this.sendERC20To.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC20);
-        } else if (_selector == this.sendERC721To.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC721);
-        } else if (_selector == this.sendERC1155To.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC1155);
-        } else {
-            revert UnknownFunctionSelector();
-        }
-
-        return currentCallPriceAmount;
+     * @notice Withdraw ERC20 transfer fees
+     */
+    function withdrawToken(address _tokenContract)
+        external
+        override
+        onlyAdminCanWithdraw
+        nonReentrant
+    {
+        IERC20 withdrawTC = IERC20(_tokenContract);
+        withdrawTC.safeTransfer(msg.sender, withdrawTC.balanceOf(address(this)));
     }
 
     /*
