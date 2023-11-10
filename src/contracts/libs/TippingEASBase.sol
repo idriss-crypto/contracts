@@ -51,12 +51,4 @@ abstract contract TippingEASBase is TippingCore {
             }
         }
 
-    function _afterTransfer(
-        AssetType _assetType,
-        address _recipient,
-        uint256 _amount,
-        uint256 _assetId,
-        address _assetContractAddress
-        ) internal override {}
-
 }

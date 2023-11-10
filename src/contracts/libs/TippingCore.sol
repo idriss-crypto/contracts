@@ -73,7 +73,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
         uint256 _amount,
         uint256 _assetId,
         address _assetContractAddress
-        ) internal virtual returns (uint256 fee, uint256 value);
+        ) internal virtual returns (uint256 fee, uint256 value) {}
 
     function _afterTransfer(
         AssetType _assetType,
@@ -81,7 +81,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
         uint256 _amount,
         uint256 _assetId,
         address _assetContractAddress
-        ) internal virtual;
+        ) internal virtual {}
 
     function _getMinimumFee() internal virtual override view returns (uint256);
 
