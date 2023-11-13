@@ -7,7 +7,7 @@ import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 import { ITipping } from "../interfaces/ITipping.sol";
 import { MultiAssetSender } from "./MultiAssetSender.sol";
-import { FeeCalculatorNew } from "./FeeCalculatorNew.sol";
+import { FeeCalculator } from "./FeeCalculator.sol";
 import { PublicGoodAttester } from "./Attestation.sol";
 
 import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
@@ -19,6 +19,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 error OnlyAdminCanWithdraw();
 error UnknownFunctionSelector();
 error WithdrawFailed();
+error RenounceOwnershipNotAllowed();
 
 
 /**
@@ -27,7 +28,7 @@ error WithdrawFailed();
  * @custom:contributor Lennard <@lennardevertz>
  * @notice This is an IDriss Send utility contract for all supported chains.
  */
-abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, MultiAssetSender, FeeCalculatorNew {
+abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, MultiAssetSender, FeeCalculator {
 
     mapping(address => bool) public admins;
     mapping(address => bool) public publicGoods;
@@ -38,7 +39,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
         address _nativeUsdAggregator,
         address _eas,
         bytes32 _easSchema
-    ) FeeCalculatorNew(_nativeUsdAggregator) PublicGoodAttester(_eas, _easSchema) {
+    ) FeeCalculator(_nativeUsdAggregator) PublicGoodAttester(_eas, _easSchema) {
         admins[msg.sender] = true;
 
         FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
@@ -253,7 +254,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
     *         However in this case it would disallow receiving payment fees by anyone.
     */
     function renounceOwnership() public override view onlyOwner {
-        revert("Operation not supported");
+        revert RenounceOwnershipNotAllowed();
     }
 
 }

@@ -17,7 +17,7 @@ import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
  * @notice This is an utility contract for calculating a fee
  * @notice In this version we use Chainlink oracles for the fee calculation
  */
-contract FeeCalculator is Ownable {
+abstract contract FeeCalculator is Ownable {
     AggregatorV3Interface internal immutable NATIVE_USD_PRICE_FEED;
     uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
     uint256 public PAYMENT_FEE_PERCENTAGE = 10;
@@ -67,12 +67,23 @@ contract FeeCalculator is Ownable {
         if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
     }
 
-    function _getMinimumFee() internal view returns (uint256) {
+    function _getMinimumFee() internal virtual view returns (uint256);
+
+    // percentage fee is the same for both no oracle and oracle contracts
+    function _getPercentageFee(uint256 _value) internal view returns (uint256) {
+        return _getPercentageFeeCommon(_value);
+    }
+
+    function _getMinimumFeeOracle() internal view returns (uint256) {
         return (_dollarToWei() * MINIMAL_PAYMENT_FEE) / MINIMAL_PAYMENT_FEE_DENOMINATOR;
     }
 
-    function _getPercentageFee(uint256 _value) internal view returns (uint256) {
+    function _getPercentageFeeCommon(uint256 _value) internal view returns (uint256) {
         return (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
+    }
+
+    function _getMinimumFeeSimple() internal view returns (uint256) {
+        return MINIMAL_PAYMENT_FEE;
     }
 
     /**

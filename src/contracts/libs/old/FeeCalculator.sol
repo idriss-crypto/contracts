@@ -8,16 +8,16 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
+import { AssetType, FeeType } from "../../enums/IDrissEnums.sol";
 
 /**
- * @title FeeCalculatorNew
+ * @title FeeCalculator
  * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @custom:contributor Lennard <@lennardevertz>
  * @notice This is an utility contract for calculating a fee
  * @notice In this version we use Chainlink oracles for the fee calculation
  */
-abstract contract FeeCalculatorNew is Ownable {
+contract FeeCalculator is Ownable {
     AggregatorV3Interface internal immutable NATIVE_USD_PRICE_FEED;
     uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
     uint256 public PAYMENT_FEE_PERCENTAGE = 10;
@@ -67,23 +67,12 @@ abstract contract FeeCalculatorNew is Ownable {
         if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
     }
 
-    function _getMinimumFee() internal virtual view returns (uint256);
-
-    // percentage fee is the same for both no oracle and oracle contracts
-    function _getPercentageFee(uint256 _value) internal view returns (uint256) {
-        return _getPercentageFeeCommon(_value);
-    }
-
-    function _getMinimumFeeOracle() internal view returns (uint256) {
+    function _getMinimumFee() internal view returns (uint256) {
         return (_dollarToWei() * MINIMAL_PAYMENT_FEE) / MINIMAL_PAYMENT_FEE_DENOMINATOR;
     }
 
-    function _getPercentageFeeCommon(uint256 _value) internal view returns (uint256) {
+    function _getPercentageFee(uint256 _value) internal view returns (uint256) {
         return (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
-    }
-
-    function _getMinimumFeeSimple() internal view returns (uint256) {
-        return MINIMAL_PAYMENT_FEE;
     }
 
     /**

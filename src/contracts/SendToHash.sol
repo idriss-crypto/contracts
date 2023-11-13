@@ -19,8 +19,8 @@ import { AssetLiability, AssetIdAmount } from "./structs/IDrissStructs.sol";
 import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 import { ConversionUtils } from "./libs/ConversionUtils.sol";
 import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
-import { FeeCalculator } from "./libs/FeeCalculator.sol";
-import { Batchable } from "./libs/Batchable.sol";
+import { FeeCalculator } from "./libs/old/FeeCalculator.sol";
+import { Batchable } from "./libs/old/Batchable.sol";
 
 
 /**
