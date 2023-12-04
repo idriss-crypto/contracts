@@ -6,6 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
+error CoinSendFailed();
+error NothingToSend();
+
 /**
  * @title MultiAssetSender
  * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
@@ -25,7 +28,9 @@ contract MultiAssetSender {
     */
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
-        require(sent, "Failed to send");
+        if (!sent) {
+            revert CoinSendFailed();
+        }
     }
 
     /**
@@ -84,7 +89,9 @@ contract MultiAssetSender {
         address _to,
         address _contractAddress
     ) internal {
-        require(_assetIds.length > 0, "Nothing to send");
+        if (_assetIds.length == 0) {
+            revert NothingToSend();
+        }
 
         IERC721 nft = IERC721(_contractAddress);
         for (uint256 i = 0; i < _assetIds.length; ++i) {
