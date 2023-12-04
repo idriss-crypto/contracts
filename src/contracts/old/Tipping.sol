@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -8,12 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
-import { ITipping } from "./interfaces/ITipping.sol";
-import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
-import { FeeCalculator } from "./libs/FeeCalculator.sol";
-import { Batchable } from "./libs/Batchable.sol";
+import { ITipping } from "../interfaces/ITipping.sol";
+import { MultiAssetSender } from "../libs/MultiAssetSender.sol";
+import { FeeCalculator } from "../libs/old/FeeCalculator.sol";
+import { Batchable } from "../libs/old/Batchable.sol";
 
-import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
+import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
 
 error tipping__withdraw__OnlyAdminCanWithdraw();
 
@@ -38,22 +38,21 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
     constructor(address _maticUsdAggregator) FeeCalculator(_maticUsdAggregator) {
         admins[msg.sender] = true;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
-        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
-        FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC721] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
 
     /**
      * @notice Send native currency tip, charging a small fee
      */
-    function sendTo(
+    function sendNativeTo(
         address _recipient,
-        uint256, // amount is used only for multicall
         string memory _message
     ) external payable override {
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
-        (, uint256 paymentValue) = _splitPayment(msgValue, AssetType.Coin);
+        (, uint256 paymentValue) = _splitPayment(msgValue, AssetType.Native);
         _sendCoin(_recipient, paymentValue);
 
         emit TipMessage(_recipient, _message, msg.sender, address(0));
@@ -62,13 +61,13 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
     /**
      * @notice Send a tip in ERC20 token, charging a small fee
      */
-    function sendTokenTo(
+    function sendERC20To(
         address _recipient,
         uint256 _amount,
         address _tokenContractAddr,
         string memory _message
     ) external payable override {
-        (, uint256 paymentValue) = _splitPayment(_amount, AssetType.Token);
+        (, uint256 paymentValue) = _splitPayment(_amount, AssetType.ERC20);
 
         _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
         _sendTokenAsset(paymentValue, _recipient, _tokenContractAddr);
@@ -87,7 +86,7 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
     ) external payable override {
         // we use it just to revert when value is too small
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
-        _splitPayment(msgValue, AssetType.NFT);
+        _splitPayment(msgValue, AssetType.ERC721);
 
         _sendNFTAsset(_tokenId, msg.sender, _recipient, _nftContractAddress);
 
@@ -173,8 +172,8 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
 
     function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
         return
-            _selector == this.sendTo.selector ||
-            _selector == this.sendTokenTo.selector ||
+            _selector == this.sendNativeTo.selector ||
+            _selector == this.sendERC20To.selector ||
             _selector == this.sendERC721To.selector ||
             _selector == this.sendERC1155To.selector
         ;
@@ -183,14 +182,14 @@ contract Tipping is Ownable, ITipping, MultiAssetSender, FeeCalculator, Batchabl
     function calculateMsgValueForACall(bytes4 _selector, bytes memory _calldata) override view internal returns (uint256) {
         uint256 currentCallPriceAmount;
 
-        if (_selector == this.sendTo.selector) {
+        if (_selector == this.sendNativeTo.selector) {
             assembly {
                 currentCallPriceAmount := mload(add(_calldata, 68))
             }
-        } else if (_selector == this.sendTokenTo.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.Token);
-        } else if (_selector == this.sendTokenTo.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.NFT);
+        } else if (_selector == this.sendERC20To.selector) {
+            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC20);
+        } else if (_selector == this.sendERC721To.selector) {
+            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC721);
         } else {
             currentCallPriceAmount = getPaymentFee(0, AssetType.ERC1155);
         }

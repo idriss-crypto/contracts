@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 enum AssetType {
-    Coin,
-    Token,
-    NFT,
+    Native,
+    ERC20,
+    ERC721,
     ERC1155
 }
 

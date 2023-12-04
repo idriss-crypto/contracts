@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import { AssetType } from "../enums/IDrissEnums.sol";
 
 interface ITipping {
-    function sendTo(
+
+    function sendNativeTo(
         address _recipient,
-        uint256 _amount,
         string memory _message
     ) external payable;
 
-    function sendTokenTo(
+    function sendERC20To(
         address _recipient,
         uint256 _amount,
         address _tokenContractAddr,

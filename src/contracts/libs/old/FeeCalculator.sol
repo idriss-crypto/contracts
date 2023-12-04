@@ -8,15 +8,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
-
-error AddressIsNull();
-error FailedToFetchNativePrice();
-error ValueSentTooSmall();
-error PercentageFeeTooSmall();
-error PaymentFeeTooSmall();
-error DenominatorTooSmall();
-error FeePercentageTooBig();
+import { AssetType, FeeType } from "../../enums/IDrissEnums.sol";
 
 /**
  * @title FeeCalculator
@@ -25,7 +17,7 @@ error FeePercentageTooBig();
  * @notice This is an utility contract for calculating a fee
  * @notice In this version we use Chainlink oracles for the fee calculation
  */
-abstract contract FeeCalculator is Ownable {
+contract FeeCalculator is Ownable {
     AggregatorV3Interface internal immutable NATIVE_USD_PRICE_FEED;
     uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
     uint256 public PAYMENT_FEE_PERCENTAGE = 10;
@@ -36,9 +28,8 @@ abstract contract FeeCalculator is Ownable {
     mapping (AssetType => FeeType) FEE_TYPE_MAPPING;
 
     constructor(address _nativeUsdAggregator) {
-        if (_nativeUsdAggregator == address(0)) {
-            revert AddressIsNull();
-        }
+        require(_nativeUsdAggregator != address(0), "Address cannot be 0");
+
         NATIVE_USD_PRICE_FEED = AggregatorV3Interface(_nativeUsdAggregator);
     }
 
@@ -49,9 +40,7 @@ abstract contract FeeCalculator is Ownable {
     */
     function _dollarToWei() internal view returns (uint256) {
         (,int256 nativePrice,,,) = NATIVE_USD_PRICE_FEED.latestRoundData();
-        if (nativePrice == 0) {
-            revert FailedToFetchNativePrice();
-        }
+        require (nativePrice > 0, "Unable to retrieve NATIVE price.");
 
         uint256 nativePriceMultiplier = 10**NATIVE_USD_PRICE_FEED.decimals();
 
@@ -78,23 +67,12 @@ abstract contract FeeCalculator is Ownable {
         if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
     }
 
-    function _getMinimumFee() internal virtual view returns (uint256);
-
-    // percentage fee is the same for both no oracle and oracle contracts
-    function _getPercentageFee(uint256 _value) internal view returns (uint256) {
-        return _getPercentageFeeCommon(_value);
-    }
-
-    function _getMinimumFeeOracle() internal view returns (uint256) {
+    function _getMinimumFee() internal view returns (uint256) {
         return (_dollarToWei() * MINIMAL_PAYMENT_FEE) / MINIMAL_PAYMENT_FEE_DENOMINATOR;
     }
 
-    function _getPercentageFeeCommon(uint256 _value) internal view returns (uint256) {
+    function _getPercentageFee(uint256 _value) internal view returns (uint256) {
         return (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
-    }
-
-    function _getMinimumFeeSimple() internal view returns (uint256) {
-        return MINIMAL_PAYMENT_FEE;
     }
 
     /**
@@ -116,26 +94,21 @@ abstract contract FeeCalculator is Ownable {
         } else {
             fee = paymentFee;
         }
-        if (_valueToSplit < fee) {
-            revert ValueSentTooSmall();
-        }
+
+        require (_valueToSplit >= fee, "Value sent is smaller than minimal fee.");
 
         value = _valueToSplit - fee;
     }
 
 
     /**
-    * @notice adjust payment fee percentage for native currency transfers
+    * @notice adjust payment fee percentage for big native currenct transfers
     * @dev Solidity is not good when it comes to handling floats. We use denominator then,
     *      e.g. to set payment fee to 1.5% , just pass paymentFee = 15 & denominator = 1000 => 15 / 1000 = 0.015 = 1.5%
     */
     function changePaymentFeePercentage (uint256 _paymentFeePercentage, uint256 _paymentFeeDenominator) external onlyOwner {
-        if (_paymentFeePercentage <= 0) {
-            revert PercentageFeeTooSmall();
-        }
-        if (_paymentFeeDenominator <= 0) {
-            revert DenominatorTooSmall();
-        }
+        require(_paymentFeePercentage > 0, "Payment fee has to be bigger than 0");
+        require(_paymentFeeDenominator > 0, "Payment fee denominator has to be bigger than 0");
 
         PAYMENT_FEE_PERCENTAGE = _paymentFeePercentage;
         PAYMENT_FEE_PERCENTAGE_DENOMINATOR = _paymentFeeDenominator;
@@ -143,18 +116,12 @@ abstract contract FeeCalculator is Ownable {
 
     /**
     * @notice adjust minimal payment fee for all asset transfers
-    * @notice $ denominated values when using Chainlink
-    * @notice wei denominated values when using simplified fee calculation
     * @dev Solidity is not good when it comes to handling floats. We use denominator then,
     *      e.g. to set minimal payment fee to 2.2$ , just pass paymentFee = 22 & denominator = 10 => 22 / 10 = 2.2
     */
     function changeMinimalPaymentFee (uint256 _minimalPaymentFee, uint256 _paymentFeeDenominator) external onlyOwner {
-        if (_minimalPaymentFee <= 0) {
-            revert PaymentFeeTooSmall();
-        }
-        if (_paymentFeeDenominator <= 0) {
-            revert DenominatorTooSmall();
-        }
+        require(_minimalPaymentFee > 0, "Payment fee has to be bigger than 0");
+        require(_paymentFeeDenominator > 0, "Payment fee denominator has to be bigger than 0");
 
         MINIMAL_PAYMENT_FEE = _minimalPaymentFee;
         MINIMAL_PAYMENT_FEE_DENOMINATOR = _paymentFeeDenominator;

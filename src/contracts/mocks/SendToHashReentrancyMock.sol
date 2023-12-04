@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import { ISendToHash } from "../interfaces/ISendToHash.sol";
 import { AssetType } from "../enums/IDrissEnums.sol";
@@ -38,12 +38,12 @@ contract SendToHashReentrancyMock {
         uint256,
         bytes calldata
     ) external {
-        _sendToAnyoneReentrancy(AssetType.NFT);
+        _sendToAnyoneReentrancy(AssetType.ERC721);
     }
 
     //ERC20 - overrides ERC20 function
     function transfer(address, uint256) external returns (bool) {
-        _sendToAnyoneReentrancy(AssetType.Token);
+        _sendToAnyoneReentrancy(AssetType.ERC20);
 
         return true;
     }
@@ -54,7 +54,7 @@ contract SendToHashReentrancyMock {
         address,
         uint256
     ) external returns (bool) {
-        _sendToAnyoneReentrancy(AssetType.Token);
+        _sendToAnyoneReentrancy(AssetType.ERC20);
 
         return true;
     }

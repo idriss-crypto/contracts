@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+
+error CoinSendFailed();
+error NothingToSend();
 
 /**
  * @title MultiAssetSender
@@ -15,6 +19,8 @@ contract MultiAssetSender {
 
     constructor() { }
 
+    using SafeERC20 for IERC20;
+
     /**
     * @notice Wrapper for sending native Coin via call function
     * @dev When using this function please make sure to not send it to anyone, verify the
@@ -22,7 +28,9 @@ contract MultiAssetSender {
     */
     function _sendCoin (address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
-        require(sent, "Failed to send");
+        if (!sent) {
+            revert CoinSendFailed();
+        }
     }
 
     /**
@@ -81,7 +89,9 @@ contract MultiAssetSender {
         address _to,
         address _contractAddress
     ) internal {
-        require(_assetIds.length > 0, "Nothing to send");
+        if (_assetIds.length == 0) {
+            revert NothingToSend();
+        }
 
         IERC721 nft = IERC721(_contractAddress);
         for (uint256 i = 0; i < _assetIds.length; ++i) {
@@ -99,8 +109,7 @@ contract MultiAssetSender {
     ) internal {
         IERC20 token = IERC20(_contractAddress);
 
-        bool sent = token.transfer(_to, _amount);
-        require(sent, "Failed to transfer token");
+        token.safeTransfer(_to, _amount);
     }
 
     /**
@@ -111,10 +120,14 @@ contract MultiAssetSender {
         address _from,
         address _to,
         address _contractAddress
-    ) internal {
+    ) internal returns (uint256) {
         IERC20 token = IERC20(_contractAddress);
 
-        bool sent = token.transferFrom(_from, _to, _amount);
-        require(sent, "Failed to transfer token");
+        uint256 balanceBefore = token.balanceOf(_to);
+
+        token.safeTransferFrom(_from, _to, _amount);
+
+        uint256 balanceAfter = token.balanceOf(_to);
+        return (balanceAfter - balanceBefore);
     }
 }

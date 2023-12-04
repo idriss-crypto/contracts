@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import { ISendToHash } from "../interfaces/ISendToHash.sol";
 import { SendToHash } from "../SendToHash.sol"; 
@@ -23,7 +23,7 @@ contract SendToHashMock is SendToHash {
 
 
     function splitPayment(uint256 _value) public view returns (uint256 fee, uint256 value) {
-        return _splitPayment(_value, AssetType.Coin);
+        return _splitPayment(_value, AssetType.Native);
     }
 
     function adjustAddress(address _addr, AssetType _assetType)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -8,13 +8,13 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
-import { ITipping } from "./interfaces/ITipping.sol";
-import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
-import { FeeCalculator } from "./libs/FeeCalculatorSimple.sol";
-import { PublicGoodAttester } from "./libs/Attestation.sol";
-import { Batchable } from "./libs/Batchable.sol";
+import { ITipping } from "../interfaces/ITipping.sol";
+import { MultiAssetSender } from "../libs/MultiAssetSender.sol";
+import { FeeCalculatorSimple } from "../libs/old/FeeCalculatorSimple.sol";
+import { PublicGoodAttester } from "../libs/Attestation.sol";
+import { Batchable } from "../libs/old/Batchable.sol";
 
-import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
+import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
 
 error tipping__withdraw__OnlyAdminCanWithdraw();
 error unknown_function_selector();
@@ -26,7 +26,7 @@ error unknown_function_selector();
  * @notice Tipping is a helper smart contract used for IDriss social media tipping functionality
  * @notice This contract features Public Good Attestations but no oracles for fee calculation
  */
-contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, PublicGoodAttester, Batchable, IERC165 {
+contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculatorSimple, PublicGoodAttester, Batchable, IERC165 {
     mapping(address => bool) public admins;
     mapping(address => bool) public publicGoods;
 
@@ -39,21 +39,20 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
         uint256 fee
     );
 
-    constructor(address _eas) PublicGoodAttester(_eas) {
+    constructor(address _eas, bytes32 _easSchema) PublicGoodAttester(_eas, _easSchema) {
         admins[msg.sender] = true;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.Percentage;
-        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Percentage;
-        FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC721] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
 
     /**
      * @notice Send native currency tip, charging a small fee
      */
-    function sendTo(
+    function sendNativeTo(
         address _recipient,
-        uint256, // amount is used only for multicall
         string memory _message
     ) external payable override {
         uint256 paymentValue;
@@ -62,7 +61,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
             paymentValue = msgValue;
             _attestDonor(_recipient);
         } else {
-            (, paymentValue) = _splitPayment(msgValue, AssetType.Coin);
+            (, paymentValue) = _splitPayment(msgValue, AssetType.Native);
         }
 
         _sendCoin(_recipient, paymentValue);
@@ -73,7 +72,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
     /**
      * @notice Send a tip in ERC20 token, charging a small fee
      */
-    function sendTokenTo(
+    function sendERC20To(
         address _recipient,
         uint256 _amount,
         address _tokenContractAddr,
@@ -84,7 +83,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
             paymentValue = _amount;
             _attestDonor(_recipient);
         } else {
-            (, paymentValue) = _splitPayment(_amount, AssetType.Token);
+            (, paymentValue) = _splitPayment(_amount, AssetType.ERC20);
         }
 
         _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
@@ -104,7 +103,7 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
     ) external payable override {
         // we use it just to revert when value is too small
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
-        (uint256 fee,) = _splitPayment(msgValue, AssetType.NFT);
+        (uint256 fee,) = _splitPayment(msgValue, AssetType.ERC721);
 
         _sendNFTAsset(_tokenId, msg.sender, _recipient, _nftContractAddress);
 
@@ -204,8 +203,8 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
 
     function isMsgValueOverride(bytes4 _selector) override pure internal returns (bool) {
         return
-            _selector == this.sendTo.selector ||
-            _selector == this.sendTokenTo.selector ||
+            _selector == this.sendNativeTo.selector ||
+            _selector == this.sendERC20To.selector ||
             _selector == this.sendERC721To.selector ||
             _selector == this.sendERC1155To.selector
         ;
@@ -214,14 +213,14 @@ contract TippingEAS is Ownable, ITipping, MultiAssetSender, FeeCalculator, Publi
     function calculateMsgValueForACall(bytes4 _selector, bytes memory _calldata) override view internal returns (uint256) {
         uint256 currentCallPriceAmount;
 
-        if (_selector == this.sendTo.selector) {
+        if (_selector == this.sendNativeTo.selector) {
             assembly {
                 currentCallPriceAmount := mload(add(_calldata, 68))
             }
-        } else if (_selector == this.sendTokenTo.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.Token);
+        } else if (_selector == this.sendERC20To.selector) {
+            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC20);
         } else if (_selector == this.sendERC721To.selector) {
-            currentCallPriceAmount = getPaymentFee(0, AssetType.NFT);
+            currentCallPriceAmount = getPaymentFee(0, AssetType.ERC721);
         } else if (_selector == this.sendERC1155To.selector) {
             currentCallPriceAmount = getPaymentFee(0, AssetType.ERC1155);
         } else {

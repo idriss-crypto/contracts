@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { TippingCore } from "./libs/TippingCore.sol";
+import { TippingEASBase } from "./libs/TippingEASBase.sol";
 
 /**
- * @title TippingOracle
+ * @title TippingEASOracle
  * @author Rafał Kalinowski <deliriusz.eth@gmail.com>
  * @custom:contributor Lennard <@lennardevertz>
- * @notice This is the IDriss Send contract for tips sent on chains supporting Chainlink oracles.
+ * @notice This is the IDriss Send contract for tips sent on chains supporting EAS attestations and Chainlink oracles.
  */
-contract TippingOracle is TippingCore {
+contract TippingEASOracle is TippingEASBase {
 
     constructor(
         address _nativeUsdAggregator,
         address _eas,
         bytes32 _easSchema
-    ) TippingCore(_nativeUsdAggregator, _eas, _easSchema)
+    ) TippingEASBase(_nativeUsdAggregator, _eas, _easSchema)
     {}
 
     /**

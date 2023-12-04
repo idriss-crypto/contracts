@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -19,8 +19,8 @@ import { AssetLiability, AssetIdAmount } from "./structs/IDrissStructs.sol";
 import { AssetType, FeeType } from "./enums/IDrissEnums.sol";
 import { ConversionUtils } from "./libs/ConversionUtils.sol";
 import { MultiAssetSender } from "./libs/MultiAssetSender.sol";
-import { FeeCalculator } from "./libs/FeeCalculator.sol";
-import { Batchable } from "./libs/Batchable.sol";
+import { FeeCalculator } from "./libs/old/FeeCalculator.sol";
+import { Batchable } from "./libs/old/Batchable.sol";
 
 
 /**
@@ -59,9 +59,9 @@ contract SendToHash is
 
         IDRISS_ADDR = _IDrissAddr;
 
-        FEE_TYPE_MAPPING[AssetType.Coin] = FeeType.PercentageOrConstantMaximum;
-        FEE_TYPE_MAPPING[AssetType.Token] = FeeType.Constant;
-        FEE_TYPE_MAPPING[AssetType.NFT] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.Native] = FeeType.PercentageOrConstantMaximum;
+        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.ERC721] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
     }
 
@@ -83,15 +83,15 @@ contract SendToHash is
         address adjustedAssetAddress = _adjustAddress(_assetContractAddress, _assetType);
         uint256 msgValue = _MSG_VALUE > 0 ? _MSG_VALUE : msg.value;
         (uint256 fee, uint256 paymentValue) = _splitPayment(msgValue, _assetType);
-        if (_assetType != AssetType.Coin) { fee = msgValue; }
-        if (_assetType == AssetType.Token || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
-        if (_assetType == AssetType.NFT) { paymentValue = 1; }
+        if (_assetType != AssetType.Native) { fee = msgValue; }
+        if (_assetType == AssetType.ERC20 || _assetType == AssetType.ERC1155) { paymentValue = _amount; }
+        if (_assetType == AssetType.ERC721) { paymentValue = 1; }
 
         setStateForSendToAnyone(_IDrissHash, paymentValue, fee, _assetType, _assetContractAddress, _assetId);
 
-        if (_assetType == AssetType.Token) {
+        if (_assetType == AssetType.ERC20) {
             _sendTokenAssetFrom(paymentValue, msg.sender, address(this), _assetContractAddress);
-        } else if (_assetType == AssetType.NFT) {
+        } else if (_assetType == AssetType.ERC721) {
             _sendNFTAsset(_assetId, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
             _sendERC1155Asset(_assetId, paymentValue, msg.sender, address(this), _assetContractAddress);
@@ -116,7 +116,7 @@ contract SendToHash is
         AssetLiability storage beneficiaryAsset = beneficiaryAssetMap[_IDrissHash][_assetType][adjustedAssetAddress];
         AssetLiability storage payerAsset = payerAssetMap[msg.sender][_IDrissHash][_assetType][adjustedAssetAddress];
 
-        if (_assetType == AssetType.Coin) {
+        if (_assetType == AssetType.Native) {
             _checkNonZeroValue(_amount, "Transferred value has to be bigger than 0");
         } else {
             _checkNonZeroValue(_amount, "Asset amount has to be bigger than 0");
@@ -131,13 +131,13 @@ contract SendToHash is
 
         uint256 paymentValue = _amount;
 
-        if (_assetType == AssetType.NFT) { paymentValue = 1; }
+        if (_assetType == AssetType.ERC721) { paymentValue = 1; }
 
         beneficiaryAsset.amount += paymentValue;
         payerAsset.amount += paymentValue;
         paymentFeesBalance += _fee;
 
-        if (_assetType == AssetType.NFT) {
+        if (_assetType == AssetType.ERC721) {
             beneficiaryAsset.assetIds[msg.sender].push(_assetId);
             payerAsset.assetIds[msg.sender].push(_assetId);
         }
@@ -177,7 +177,7 @@ contract SendToHash is
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress].assetIdAmounts[payers[i]];
             delete payerAssetMap[payers[i]][hashWithPassword][_assetType][adjustedAssetAddress];
             delete beneficiaryPayersMap[hashWithPassword][_assetType][adjustedAssetAddress][payers[i]];
-            if (_assetType == AssetType.NFT) {
+            if (_assetType == AssetType.ERC721) {
                 uint256[] memory assetIds = beneficiaryAsset.assetIds[payers[i]];
                 delete beneficiaryAsset.assetIds[payers[i]];
                 _sendNFTAssetBatch(assetIds, address(this), ownerIDrissAddr, _assetContractAddress);
@@ -192,9 +192,9 @@ contract SendToHash is
 
         delete beneficiaryAssetMap[hashWithPassword][_assetType][adjustedAssetAddress];
 
-        if (_assetType == AssetType.Coin) {
+        if (_assetType == AssetType.Native) {
             _sendCoin(ownerIDrissAddr, amountToClaim);
-        } else if (_assetType == AssetType.Token) {
+        } else if (_assetType == AssetType.ERC20) {
             _sendTokenAsset(amountToClaim, ownerIDrissAddr, _assetContractAddress);
         }
 
@@ -247,11 +247,11 @@ contract SendToHash is
         // has to be invoked after all reads required by this function, as it modifies state
         uint256 amountToRevert = setStateForRevertPayment(_IDrissHash, _assetType, _assetContractAddress);
 
-        if (_assetType == AssetType.Coin) {
+        if (_assetType == AssetType.Native) {
             _sendCoin(msg.sender, amountToRevert);
-        } else if (_assetType == AssetType.Token) {
+        } else if (_assetType == AssetType.ERC20) {
             _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
-        } else if (_assetType == AssetType.NFT) {
+        } else if (_assetType == AssetType.ERC721) {
             _sendNFTAssetBatch(assetIds, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
             uint256[] memory amounts = new uint256[](assetAmountIds.length);
@@ -291,7 +291,7 @@ contract SendToHash is
         for (uint256 i = 0; i < payers.length; ++i) {
             if (msg.sender == payers[i]) {
                 delete beneficiaryPayersMap[_IDrissHash][_assetType][adjustedAssetAddress][payers[i]];
-                if (_assetType == AssetType.NFT) {
+                if (_assetType == AssetType.ERC721) {
                     delete beneficiaryAsset.assetIds[payers[i]];
                 } else if (_assetType == AssetType.ERC1155) {
                     delete beneficiaryAsset.assetIdAmounts[payers[i]];
@@ -301,7 +301,7 @@ contract SendToHash is
             }
         }
 
-        if (_assetType == AssetType.NFT) {
+        if (_assetType == AssetType.ERC721) {
             delete beneficiaryAsset.assetIds[msg.sender];
         } else if (_assetType == AssetType.ERC1155) {
             delete beneficiaryAsset.assetIdAmounts[msg.sender];
@@ -324,7 +324,7 @@ contract SendToHash is
 
         _checkNonZeroValue(_amount, "Nothing to transfer");
 
-        if (_assetType == AssetType.NFT) {
+        if (_assetType == AssetType.ERC721) {
             for (uint256 i = 0; i < assetIds.length; ++i) {
                 setStateForSendToAnyone(_ToIDrissHash, _amount, 0, _assetType, _assetContractAddress, assetIds[i]);
             }
@@ -361,7 +361,7 @@ contract SendToHash is
             assetType := mload(add(_calldata, 100))
         }
 
-        if (assetType != AssetType.Coin) {
+        if (assetType != AssetType.Native) {
             currentCallPriceAmount = getPaymentFee(0, assetType);
         }
 
@@ -398,7 +398,7 @@ contract SendToHash is
         internal
         pure
         returns (address) {
-            if (_assetType == AssetType.Coin) {
+            if (_assetType == AssetType.Native) {
                 return address(0);
             }
             return _addr;
