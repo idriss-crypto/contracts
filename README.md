@@ -43,3 +43,7 @@ npm run deploy-dev
 npm run deploy-test
 npm run deploy-prod
 ```
+
+## License
+
+This project is licensed under [GPLv3](https://github.com/idriss-crypto/contracts/blob/main/LICENSE).
