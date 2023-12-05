@@ -11,7 +11,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
 
 error AddressIsNull();
-error FailedToFetchNativePrice();
 error ValueSentTooSmall();
 error PercentageFeeTooSmall();
 error PaymentFeeTooSmall();
@@ -27,6 +26,8 @@ error FeePercentageTooBig();
  */
 abstract contract FeeCalculator is Ownable {
     AggregatorV3Interface internal immutable NATIVE_USD_PRICE_FEED;
+    AggregatorV3Interface internal immutable SEQUENCER_UPTIME_FEED;
+    uint256 public NATIVE_WEI_MULTIPLIER = 10**18;
     uint256 public constant PAYMENT_FEE_SLIPPAGE_PERCENT = 5;
     uint256 public PAYMENT_FEE_PERCENTAGE = 10;
     uint256 public PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
@@ -34,13 +35,25 @@ abstract contract FeeCalculator is Ownable {
     uint256 public MINIMAL_PAYMENT_FEE_DENOMINATOR = 1;
     // you have to pass your desired fee types in a constructor deriving this contract
     mapping (AssetType => FeeType) FEE_TYPE_MAPPING;
+    uint256 public NATIVE_USD_STALE_THRESHOLD; //  should be the update period
+    int256 public FALLBACK_PRICE;
+    uint256 public FALLBACK_DECIMALS;
+    bool public checkSequencer;
 
-    constructor(address _nativeUsdAggregator) {
+    constructor(address _nativeUsdAggregator, address _sequencerAddress, uint256 _stalenessThreshold, int256 _fallbackFeePrice, uint256 _fallbackDecimals) {
+        // ToDo: check, as simplified versions will contain no AggregatorV3Interface oracle
         if (_nativeUsdAggregator == address(0)) {
             revert AddressIsNull();
         }
         NATIVE_USD_PRICE_FEED = AggregatorV3Interface(_nativeUsdAggregator);
+        SEQUENCER_UPTIME_FEED = AggregatorV3Interface(_nativeUsdAggregator);
+        checkSequencer = address(0) != _sequencerAddress;
+        NATIVE_USD_STALE_THRESHOLD = _stalenessThreshold;
+        FALLBACK_PRICE = _fallbackFeePrice;
+        FALLBACK_DECIMALS = _fallbackDecimals;
     }
+
+    event OracleFailed(string reason);
 
     /*
     * @notice Get current amount of wei in a dollar
@@ -48,14 +61,35 @@ abstract contract FeeCalculator is Ownable {
     *      so we have to convert it back to get current amount of wei in a dollar
     */
     function _dollarToWei() internal view returns (uint256) {
-        (,int256 nativePrice,,,) = NATIVE_USD_PRICE_FEED.latestRoundData();
-        if (nativePrice == 0) {
-            revert FailedToFetchNativePrice();
+        int256 nativePrice = FALLBACK_PRICE;
+        uint256 nativePriceMultiplier = 10**FALLBACK_DECIMALS;
+
+        try NATIVE_USD_PRICE_FEED.latestRoundData() returns
+            (uint80 roundId, int256 _latestPrice, uint256, uint256 _lastUpdatedAt, uint80) {
+            if (_latestPrice > 0 &&
+                _lastUpdatedAt != 0 &&
+                (block.timestamp - _lastUpdatedAt <= NATIVE_USD_STALE_THRESHOLD)) {
+                if (checkSequencer) {
+                    try SEQUENCER_UPTIME_FEED.latestRoundData() returns (uint80, int256 answer, uint256 startedAt, uint256, uint80) {
+                       bool isSequencerUp = answer == 0;
+                       uint256 timeSinceUp = block.timestamp - startedAt;
+                       if (isSequencerUp && (timeSinceUp > NATIVE_USD_STALE_THRESHOLD)) {
+                            nativePrice = _latestPrice;
+                            nativePriceMultiplier = 10**NATIVE_USD_PRICE_FEED.decimals();
+                       }
+                    } catch {
+                        // Use fallback values
+                    }
+                } else {
+                    // accept oracle values
+                    nativePrice = _latestPrice;
+                    nativePriceMultiplier = 10**NATIVE_USD_PRICE_FEED.decimals();
+                }
+            }
+        } catch {
+            // Use fallback values
         }
-
-        uint256 nativePriceMultiplier = 10**NATIVE_USD_PRICE_FEED.decimals();
-
-        return(10**18 * nativePriceMultiplier) / uint256(nativePrice);
+        return(NATIVE_WEI_MULTIPLIER * nativePriceMultiplier) / uint256(nativePrice);
     }
 
     /**

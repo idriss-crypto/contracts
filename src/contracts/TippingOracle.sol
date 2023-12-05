@@ -13,9 +13,13 @@ contract TippingOracle is TippingCore {
 
     constructor(
         address _nativeUsdAggregator,
+        address _sequencerAddress,
+        uint256 _stalenessThreshold,
+        int256 _fallbackPrice,
+        uint256 _fallbackDecimals,
         address _eas,
         bytes32 _easSchema
-    ) TippingCore(_nativeUsdAggregator, _eas, _easSchema)
+    ) TippingCore(_nativeUsdAggregator, _sequencerAddress, _stalenessThreshold, _fallbackPrice, _fallbackDecimals, _eas, _easSchema)
     {}
 
     /**

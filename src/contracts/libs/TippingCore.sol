@@ -34,12 +34,15 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
     mapping(address => bool) public publicGoods;
 
     using SafeERC20 for IERC20;
-
     constructor(
         address _nativeUsdAggregator,
+        address _sequencerAddress,
+        uint256 _stalenessThreshold,
+        int256 _fallbackPrice,
+        uint256 _fallbackDecimals,
         address _eas,
         bytes32 _easSchema
-    ) FeeCalculator(_nativeUsdAggregator) PublicGoodAttester(_eas, _easSchema) {
+    ) FeeCalculator(_nativeUsdAggregator, _sequencerAddress, _stalenessThreshold, _fallbackPrice, _fallbackDecimals) PublicGoodAttester(_eas, _easSchema) {
         admins[msg.sender] = true;
 
         FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
