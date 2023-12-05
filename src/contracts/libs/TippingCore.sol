@@ -124,7 +124,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
         uint256 _amount,
         address _tokenContractAddr,
         string memory _message
-    ) external payable override nonReentrant {
+    ) external override nonReentrant {
         uint256 amountIn =  _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
 
         (uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.ERC20, _recipient, amountIn, 0, _tokenContractAddr);

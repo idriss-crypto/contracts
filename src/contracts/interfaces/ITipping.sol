@@ -15,7 +15,7 @@ interface ITipping {
         uint256 _amount,
         address _tokenContractAddr,
         string memory _message
-    ) external payable;
+    ) external;
 
     function sendERC721To(
         address _recipient,
