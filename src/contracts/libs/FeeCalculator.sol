@@ -15,7 +15,8 @@ error ValueSentTooSmall();
 error PercentageFeeTooSmall();
 error PaymentFeeTooSmall();
 error DenominatorTooSmall();
-error FeePercentageTooBig();
+error MinimalFeeTooBig();
+error MinimalFeePercentageTooBig();
 
 /**
  * @title FeeCalculator
@@ -170,6 +171,10 @@ abstract contract FeeCalculator is Ownable {
         if (_paymentFeeDenominator <= 0) {
             revert DenominatorTooSmall();
         }
+        // can't go higher than 5% fee
+        if (100*_paymentFeePercentage/_paymentFeeDenominator >= 5) {
+            revert MinimalFeePercentageTooBig();
+        }
 
         PAYMENT_FEE_PERCENTAGE = _paymentFeePercentage;
         PAYMENT_FEE_PERCENTAGE_DENOMINATOR = _paymentFeeDenominator;
@@ -188,6 +193,9 @@ abstract contract FeeCalculator is Ownable {
         }
         if (_paymentFeeDenominator <= 0) {
             revert DenominatorTooSmall();
+        }
+        if (_minimalPaymentFee/_paymentFeeDenominator >= 5 || _minimalPaymentFee >= 5) {
+            revert MinimalFeeTooBig();
         }
 
         MINIMAL_PAYMENT_FEE = _minimalPaymentFee;
