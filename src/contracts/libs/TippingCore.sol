@@ -71,14 +71,6 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
      * Abstract functions to be overwritten
     */
 
-    function _beforeTransfer(
-        AssetType _assetType,
-        address _recipient,
-        uint256 _amount,
-        uint256 _assetId,
-        address _assetContractAddress
-        ) internal virtual returns (uint256 fee, uint256 value) {}
-
     function _afterTransfer(
         AssetType _assetType,
         address _recipient,
@@ -88,6 +80,25 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
         ) internal virtual {}
 
     function _getMinimumFee() internal virtual override view returns (uint256);
+
+    /**
+     * Function to be overwritten by EAS Tipping contracts
+    */
+
+    function _beforeTransfer(
+        AssetType _assetType,
+        address _recipient,
+        uint256 _amount,
+        uint256 _assetId,
+        address _assetContractAddress
+        ) internal virtual returns (uint256 fee, uint256 value) {
+            if (publicGoods[_recipient]) {
+                value = _amount;
+                fee;
+            } else {
+                (fee, value) = _splitPayment(_amount, _assetType);
+            }
+        }
 
     /**
      * Tipping functions

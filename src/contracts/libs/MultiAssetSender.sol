@@ -77,7 +77,7 @@ contract MultiAssetSender {
         address _contractAddress
     ) internal {
         IERC721 nft = IERC721(_contractAddress);
-        nft.transferFrom(_from, _to, _assetIds, "");
+        nft.transferFrom(_from, _to, _assetIds);
     }
 
     /**
@@ -95,7 +95,7 @@ contract MultiAssetSender {
 
         IERC721 nft = IERC721(_contractAddress);
         for (uint256 i = 0; i < _assetIds.length; ++i) {
-            nft.transferFrom(_from, _to, _assetIds[i], "");
+            nft.transferFrom(_from, _to, _assetIds[i]);
         }
     }
 
