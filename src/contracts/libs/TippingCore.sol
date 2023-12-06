@@ -56,6 +56,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
         string message,
         address indexed sender,
         address indexed tokenAddress,
+        uint256 tokenId,
         uint256 amount,
         uint256 fee
     );
@@ -119,7 +120,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
 
         _afterTransfer(AssetType.Native, _recipient, paymentValue, 0, address(0));
 
-        emit TipMessage(_recipient, _message, msg.sender, address(0), paymentValue, fee);
+        emit TipMessage(_recipient, _message, msg.sender, address(0), 0, paymentValue, fee);
     }
 
     /**
@@ -147,7 +148,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
 
         _afterTransfer(AssetType.ERC20, _recipient, amountIn, 0, _tokenContractAddr);
 
-        emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr, paymentValue, fee);
+        emit TipMessage(_recipient, _message, msg.sender, _tokenContractAddr, 0, paymentValue, fee);
     }
 
     /**
@@ -170,7 +171,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
 
         _afterTransfer(AssetType.ERC721, _recipient, msg.value, _tokenId, _nftContractAddress);
 
-        emit TipMessage(_recipient, _message, msg.sender, _nftContractAddress, msg.value, fee);
+        emit TipMessage(_recipient, _message, msg.sender, _nftContractAddress, _tokenId, msg.value, fee);
     }
 
     /**
@@ -195,7 +196,7 @@ abstract contract TippingCore is Ownable, ReentrancyGuard, PublicGoodAttester, I
 
         _afterTransfer(AssetType.ERC1155, _recipient, msg.value, _assetId, _assetContractAddress);
 
-        emit TipMessage(_recipient, _message, msg.sender, _assetContractAddress, msg.value, fee);
+        emit TipMessage(_recipient, _message, msg.sender, _assetContractAddress, _assetId, msg.value, fee);
     }
 
     /**
