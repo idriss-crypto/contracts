@@ -37,6 +37,23 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
 
     using SafeERC20 for IERC20;
 
+    struct BatchCall {
+        AssetType assetType,
+        address recipient,
+        uint256 amount,
+        uint256 tokenId,
+        address tokenAddress,
+        string calldata message
+    }
+
+    struct MultiSendAssetHelper {
+        AssetType assetType,
+        address assetAddress,
+        uint256 tokenId,
+        uint256 amountIn,
+        uint256 totalFee
+    }
+
     constructor(
         bool _supportsChainlink,
         bool _supportsEAS,
@@ -196,6 +213,47 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
 
         emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC1155, _assetContractAddress, _assetId, msg.value, fee);
     }
+
+/** FIXME: unfinished */
+    function calculateBatchFee(BatchCall [] calldata calls) external view returns (MultiSendAssetHelper[] memory) {
+        MultiSendAssetHelper[] memory resultArray;
+        mapping(address => MultiSendAssetHelper) memory resultMapping;
+
+        for (uint256 i; i < calls.length; i++) {
+            if (calls[i].assetType == AssetType.Native) resultMapping[calls.tokenAddress(0)].amountIn += calls.amount;
+            else {
+                (uint256 fee, uint256 value) = _splitPayment(calls.amount, calls.assetType);
+                resultMapping[calls.tokenAddress].amountIn += fee;
+            }
+        }
+    }
+
+/** FIXME: unfinished */
+
+    function batchSendTo (BatchCall [] calldata calls) external nonReentrant {
+
+        uint256 msgValueUsed;
+
+        for (uint256 i; i < calls.length; i++) {
+            if (calls.assetType == AssetType.Native) {
+                _sendTo(calls.recipient, calls.amount, calls.message);
+                msgValueUsed += calls.amount;
+            } else if (calls.assetType == AssetType.ERC20) {
+                _sendERC20To(calls.recipient, calls.amount, calls.tokenAddress, calls.message);
+            } else if (calls.assetType == AssetType.ERC721) {
+                _sendERC721To(calls.recipient, calls.tokenAddress, calls.tokenId, calls.message);
+            } else if (calls.assetType == AssetType.ERC1155) {
+                _sendERC1155To(calls.recipient, calls.amount, calls.tokenAddress, calls.tokenId, calls.message);
+            } else {
+                revert tipping__UnsupportedAssetType;
+            }
+        }
+
+        if (msgValueUsed != msg.value) {
+            revert tipping__MsgValueMismatch(mgs.value, msgValueUsed);
+        }
+    }
+
 
     /**
      * Trusted admin methods
