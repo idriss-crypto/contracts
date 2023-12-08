@@ -12,6 +12,7 @@ import { HardhatUserConfig, task } from 'hardhat/config'
 import {Contract} from "ethers";
 
 const IDrissArtifact = require('./src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/IDriss.json')
+const IDrissWrapperArtifact = require('./src/artifacts/src/contracts/mocks/IDrissWrapperMock.sol/IDrissWrapperContract.json')
 const MaticPriceAggregatorV3MockArtifact = require('./src/artifacts/src/contracts/mocks/MaticPriceAggregatorV3Mock.sol/MaticPriceAggregatorV3Mock.json')
 const MockERC1155Artifact = require('./src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockERC1155.json')
 const MockNFTArtifact = require('./src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockNFT.json')
@@ -104,6 +105,7 @@ task('setup', 'setup smart contracts for development', async (args, hre) => {
     idrissContract.deployed()
   ])
 
+  mockMultiResolver = await hre.ethers.getContractFactoryFromArtifact(IDrissArtifact).then(contract => contract.deploy(idrissContract.address))
   sendToHashContract = await hre.ethers.getContractFactoryFromArtifact(SendToHashArtifact).then(contract => contract.deploy(idrissContract.address, mockPriceOracleContract.address))
   mockERC1155Contract = await hre.ethers.getContractFactoryFromArtifact(MockERC1155Artifact).then(contract => contract.deploy())
   mockNFTContract = await hre.ethers.getContractFactoryFromArtifact(MockNFTArtifact).then(contract => contract.deploy())
@@ -111,12 +113,14 @@ task('setup', 'setup smart contracts for development', async (args, hre) => {
   mockToken2Contract = await hre.ethers.getContractFactoryFromArtifact(MockTokenArtifact).then(contract => contract.deploy())
 
   await Promise.all([
+    mockMultiResolver.deployed(),
     sendToHashContract.deployed(),
     mockERC1155Contract.deployed(),
     mockNFTContract.deployed(),
     mockTokenContract.deployed(),
     mockToken2Contract.deployed(),
   ])
+
 
   await idrissContract.functions.addIDriss(signer1Hash, signer1Address)
   await idrissContract.functions.addIDriss(signer2Hash, signer2Address)
@@ -136,6 +140,7 @@ task('setup', 'setup smart contracts for development', async (args, hre) => {
   console.log("Deployed Contracts:")
   console.table([
     {name: "IDriss Registry", address: idrissContract.address},
+    {name: "IDriss Wrapper", address: mockMultiResolver.address},
     {name: "Price Oracle", address: mockPriceOracleContract.address},
     {name: "Send To Anyone", address: sendToHashContract.address},
     {name: "Mock ERC20", address: mockTokenContract.address},
