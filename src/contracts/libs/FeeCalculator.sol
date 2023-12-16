@@ -36,6 +36,7 @@ abstract contract FeeCalculator is Ownable {
     uint256 public MINIMAL_PAYMENT_FEE_DENOMINATOR = 1;
     // you have to pass your desired fee types in a constructor deriving this contract
     mapping (AssetType => FeeType) FEE_TYPE_MAPPING;
+    mapping (address => bool) supportedERC20;
     uint256 public NATIVE_USD_STALE_THRESHOLD; //  should be the update period
     int256 public FALLBACK_PRICE;
     uint256 public FALLBACK_DECIMALS;
@@ -113,19 +114,42 @@ abstract contract FeeCalculator is Ownable {
         if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
     }
 
+
+    /**
+     * @notice Calculates payment fee
+     * @param _value - payment value
+     * @param _assetType - asset type, required as ERC20 & ERC721 only take minimal fee
+     * @return fee - processing fee, few percent of slippage is allowed
+     */
+    function getPaymentFeePost(uint256 _value, AssetType _assetType) public view returns (uint256) {
+        uint256 minimumPaymentFee = _getMinimumFee();
+        uint256 percentageFee = _getPercentageFeePost(_value);
+        FeeType feeType = FEE_TYPE_MAPPING[_assetType];
+        if (feeType == FeeType.Constant) {
+            return minimumPaymentFee;
+        } else if (feeType == FeeType.Percentage) {
+            return percentageFee;
+        }
+
+        // default case - PercentageOrConstantMaximum
+        if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
+    }
+
+
     function _getMinimumFee() internal virtual view returns (uint256);
 
     // percentage fee is the same for both no oracle and oracle contracts
     function _getPercentageFee(uint256 _value) internal view returns (uint256) {
-        return _getPercentageFeeCommon(_value);
+        return (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
+    }
+
+    // percentage fee post incoming transaction to get % from original amount
+    function _getPercentageFeePost(uint256 _value) internal view returns (uint256) {
+        return _value - (_value * PAYMENT_FEE_PERCENTAGE_DENOMINATOR / (PAYMENT_FEE_PERCENTAGE_DENOMINATOR + PAYMENT_FEE_PERCENTAGE))
     }
 
     function _getMinimumFeeOracle() internal view returns (uint256) {
         return (_dollarToWei() * MINIMAL_PAYMENT_FEE) / MINIMAL_PAYMENT_FEE_DENOMINATOR;
-    }
-
-    function _getPercentageFeeCommon(uint256 _value) internal view returns (uint256) {
-        return (_value * PAYMENT_FEE_PERCENTAGE) / PAYMENT_FEE_PERCENTAGE_DENOMINATOR;
     }
 
     function _getMinimumFeeSimple() internal view returns (uint256) {
@@ -141,7 +165,7 @@ abstract contract FeeCalculator is Ownable {
      */
     function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (uint256 fee, uint256 value) {
         uint256 minimalPaymentFee = _getMinimumFee();
-        uint256 paymentFee = getPaymentFee(_valueToSplit, _assetType);
+        uint256 paymentFee = getPaymentFeePost(_valueToSplit, _assetType);
 
         // we accept slippage of native coin price if fee type is not percentage - it this case we always get % no matter dollar price
         if (FEE_TYPE_MAPPING[_assetType] != FeeType.Percentage

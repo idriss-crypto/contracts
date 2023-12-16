@@ -68,9 +68,10 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         admins[msg.sender] = true;
 
         FEE_TYPE_MAPPING[AssetType.Native] = FeeType.Percentage;
-        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Percentage;
+        FEE_TYPE_MAPPING[AssetType.ERC20] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC721] = FeeType.Constant;
         FEE_TYPE_MAPPING[AssetType.ERC1155] = FeeType.Constant;
+        FEE_TYPE_MAPPING[AssetType.SUPPORTED_ERC20] = FeeType.Percentage;
         SUPPORTS_CHAINLINK = _supportsChainlink;
         SUPPORTS_EAS = _supportsEAS;
     }
@@ -120,6 +121,8 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
                     _attestDonor(_recipient);
                 }
             } else {
+                // overwriting fee type for supported erc20s
+                if (supportedERC20[_assetContractAddress]) _assetType = AssetType.SUPPORTED_ERC20;
                 (fee, value) = _splitPayment(_amount, _assetType);
             }
         }
@@ -230,26 +233,52 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
 
 /** FIXME: unfinished */
 
+/**
+* @notice Please note that this protocol does not support tokens with
+ * non-standard ERC20 interfaces and functionality,
+ * such as tokens with rebasing functionality or fee-on-transfer token.
+ * Usage of such tokens may result in a loss of assets.
+*/
     function batchSendTo (BatchCall [] calldata calls) external nonReentrant {
 
-        uint256 msgValueUsed;
+        mapping(address => uint256) amountsIn;
+        address[] erc20In;
 
         for (uint256 i; i < calls.length; i++) {
+            if(calls.assetType == AssetType.ERC20 || calls.assetType == AssetType.SUPPORTED_ERC20) {
+                amountsIn[calls.tokenAddress] += calls.amount;
+                erc20In.push(calls.tokenAddress);
+            }
+        }
+
+        uint256 msgValueUsed;
+        uint256 msgFeeUsed;
+
+        for (uint256 i; i < calls.length; i++) {
+            if (supportedERC20[calls.assetAddress]) calls.assetType = AssetType.SUPPORTED_ERC20;
+            (uint256 fee, uint256 paymentValue) = _beforeTransfer(calls.assetType, calls.recipient, calls.amount, 0, address(0));
             if (calls.assetType == AssetType.Native) {
-                _sendTo(calls.recipient, calls.amount, calls.message);
-                msgValueUsed += calls.amount;
+                _sendTo(calls.recipient, paymentValue, calls.message);
+                msgValueUsed += paymentValue;
+                msgFeeUsed += fee;
             } else if (calls.assetType == AssetType.ERC20) {
-                _sendERC20To(calls.recipient, calls.amount, calls.tokenAddress, calls.message);
+                _sendERC20To(calls.recipient, paymentValue, calls.tokenAddress, calls.message);
+            else if (calls.assetType == AssetType.SUPPORTED_ERC20) {
+                _sendERC20To(calls.recipient, paymentValue, calls.tokenAddress, calls.message);
+                msgFeeUsed += fee;
             } else if (calls.assetType == AssetType.ERC721) {
                 _sendERC721To(calls.recipient, calls.tokenAddress, calls.tokenId, calls.message);
+                msgFeeUsed += fee;
             } else if (calls.assetType == AssetType.ERC1155) {
+                /** ToDo: check amount */
                 _sendERC1155To(calls.recipient, calls.amount, calls.tokenAddress, calls.tokenId, calls.message);
+                msgFeeUsed += fee;
             } else {
                 revert tipping__UnsupportedAssetType;
             }
         }
 
-        if (msgValueUsed != msg.value) {
+        if (msgValueUsed + msgFeeUsed != msg.value) {
             revert tipping__MsgValueMismatch(mgs.value, msgValueUsed);
         }
     }
@@ -280,7 +309,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         onlyOwner
         nonReentrant
     {
-        admins[_adminAddress] = false;
+        delete admins[_adminAddress];
     }
 
     /**
@@ -295,6 +324,20 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
      */
     function deletePublicGood(address publicGoodAddress) external onlyOwner nonReentrant {
         delete publicGoods[publicGoodAddress];
+    }
+
+    /**
+     * @notice Add supported erc20 address with percentage fee structure
+     */
+    function addSupportedERC20(address erc20Address) external onlyOwner nonReentrant {
+        supportedERC20[publicGoodAddress] = true;
+    }
+
+    /**
+     * @notice ERC20 returns to minimum amount fee structure
+     */
+    function deleteSupportedERC20(address erc20Address) external onlyOwner nonReentrant {
+        delete supportedERC20[publicGoodAddress];
     }
 
     /**

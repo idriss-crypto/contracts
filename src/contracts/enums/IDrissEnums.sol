@@ -5,7 +5,8 @@ enum AssetType {
     Native,
     ERC20,
     ERC721,
-    ERC1155
+    ERC1155,
+    SUPPORTED_ERC20
 }
 
 /**
