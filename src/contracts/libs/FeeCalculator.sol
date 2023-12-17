@@ -161,7 +161,7 @@ abstract contract FeeCalculator is Ownable {
      * @param _valueToSplit - payment value, taken from msg.value
      * @param _assetType - asset type, as there may be different calculation logic for each type
      * @return fee - processing fee, few percent of slippage is allowed
-     * @return value - payment value after substracting fee
+     * @return value - payment value after subtracting fee
      * ToDo: what happens in the case of ERC20, ERC721, ERC1155 => pass msg.value AND amount? what about batch calls?
      */
     function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (bool isFeeNative, uint256 fee, uint256 value) {
