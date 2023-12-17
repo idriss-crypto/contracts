@@ -162,10 +162,12 @@ abstract contract FeeCalculator is Ownable {
      * @param _assetType - asset type, as there may be different calculation logic for each type
      * @return fee - processing fee, few percent of slippage is allowed
      * @return value - payment value after substracting fee
+     * ToDo: what happens in the case of ERC20, ERC721, ERC1155 => pass msg.value AND amount? what about batch calls?
      */
-    function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (uint256 fee, uint256 value) {
+    function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (bool isFeeNative, uint256 fee, uint256 value) {
         uint256 minimalPaymentFee = _getMinimumFee();
         uint256 paymentFee = getPaymentFeePost(_valueToSplit, _assetType);
+        isFeeNative = true;
 
         // we accept slippage of native coin price if fee type is not percentage - it this case we always get % no matter dollar price
         if (FEE_TYPE_MAPPING[_assetType] != FeeType.Percentage
@@ -179,7 +181,14 @@ abstract contract FeeCalculator is Ownable {
             revert ValueSentTooSmall();
         }
 
-        value = _valueToSplit - fee;
+        if (FEE_assetType === AssetType.SUPPORTED_ERC20) {
+            isFeeNative = false;
+        }
+        if (FEE_TYPE_MAPPING[_assetType] === FeeType.Percentage {
+            value = _valueToSplit - fee;
+        } else {
+            value = _valueToSplit;
+        }
     }
 
 

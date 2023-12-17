@@ -56,7 +56,7 @@ contract MultiAssetSender {
      *      ALL tokens "for simplicity"... Hence, it has to be done before calling function that transfers the token
      *      to smart contract, and revoked afterwards
      */
-    function _sendERC1155Asset (
+    function _sendERC1155 (
         uint256 _assetId,
         uint256 _amount,
         address _from,
@@ -70,14 +70,14 @@ contract MultiAssetSender {
     /**
      * @notice Wrapper for sending NFT asset
      */
-    function _sendNFTAsset (
-        uint256 _assetIds,
+    function _sendERC721 (
+        uint256 _assetId,
         address _from,
         address _to,
         address _contractAddress
     ) internal {
         IERC721 nft = IERC721(_contractAddress);
-        nft.transferFrom(_from, _to, _assetIds);
+        nft.transferFrom(_from, _to, _assetId);
     }
 
     /**
@@ -102,7 +102,7 @@ contract MultiAssetSender {
     /**
      * @notice Wrapper for sending ERC20 Token asset with additional checks
      */
-    function _sendTokenAsset (
+    function _sendERC20 (
         uint256 _amount,
         address _to,
         address _contractAddress
@@ -115,7 +115,7 @@ contract MultiAssetSender {
     /**
      * @notice Wrapper for sending ERC20 token from specific account with additional checks and iteraton over an array
      */
-    function _sendTokenAssetFrom (
+    function _sendERC20From (
         uint256 _amount,
         address _from,
         address _to,

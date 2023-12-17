@@ -20,6 +20,7 @@ error OnlyAdminCanWithdraw();
 error UnknownFunctionSelector();
 error WithdrawFailed();
 error RenounceOwnershipNotAllowed();
+error FeeHigherThanProvidedNativeCurrency();
 
 
 /**
@@ -113,7 +114,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         uint256 _amount,
         uint256 _assetId,
         address _assetContractAddress
-        ) internal returns (uint256 fee, uint256 value) {
+        ) internal returns (bool isFeeNative, uint256 fee, uint256 value) {
             if (publicGoods[_recipient]) {
                 value = _amount;
                 fee;
@@ -123,7 +124,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
             } else {
                 // overwriting fee type for supported erc20s
                 if (supportedERC20[_assetContractAddress]) _assetType = AssetType.SUPPORTED_ERC20;
-                (fee, value) = _splitPayment(_amount, _assetType);
+                (isFeeNative, fee, value) = _splitPayment(_amount, _assetType);
             }
         }
 
@@ -140,7 +141,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         address _recipient,
         string memory _message
     ) external payable override nonReentrant {
-        (uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.Native, _recipient, msg.value, 0, address(0));
+        (,uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.Native, _recipient, msg.value, 0, address(0));
 
         _sendCoin(_recipient, paymentValue);
 
@@ -164,11 +165,13 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         address _tokenContractAddr,
         string memory _message
     ) external override nonReentrant {
-        uint256 amountIn =  _sendTokenAssetFrom(_amount, msg.sender, address(this), _tokenContractAddr);
+        uint256 amountIn =  _sendERC20From(_amount, msg.sender, address(this), _tokenContractAddr);
 
-        (uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.ERC20, _recipient, amountIn, 0, _tokenContractAddr);
+        (bool isFeeNative, uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.ERC20, _recipient, amountIn, 0, _tokenContractAddr);
 
-        _sendTokenAsset(paymentValue, _recipient, _tokenContractAddr);
+        if (isFeeNative && fee > msg.value) revert FeeHigherThanProvidedNativeCurrency();
+
+        _sendERC20(paymentValue, _recipient, _tokenContractAddr);
 
         emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC20, _tokenContractAddr, 0, paymentValue, fee);
     }
@@ -187,9 +190,9 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         string memory _message
     ) external payable override nonReentrant {
 
-        (uint256 fee,) = _beforeTransfer(AssetType.ERC721, _recipient, msg.value, _tokenId, _nftContractAddress);
+        (,uint256 fee,) = _beforeTransfer(AssetType.ERC721, _recipient, msg.value, _tokenId, _nftContractAddress);
 
-        _sendNFTAsset(_tokenId, msg.sender, _recipient, _nftContractAddress);
+        _sendERC721(_tokenId, msg.sender, _recipient, _nftContractAddress);
 
         emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC721, _nftContractAddress, _tokenId, msg.value, fee);
     }
@@ -210,9 +213,9 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         string memory _message
     ) external payable override nonReentrant {
 
-        (uint256 fee,) = _beforeTransfer(AssetType.ERC1155, _recipient, msg.value, _assetId, _assetContractAddress);
+        (,uint256 fee,) = _beforeTransfer(AssetType.ERC1155, _recipient, msg.value, _assetId, _assetContractAddress);
 
-        _sendERC1155Asset(_assetId, _amount, msg.sender, _recipient, _assetContractAddress);
+        _sendERC1155(_assetId, _amount, msg.sender, _recipient, _assetContractAddress);
 
         emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC1155, _assetContractAddress, _assetId, msg.value, fee);
     }
@@ -241,45 +244,42 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
 */
     function batchSendTo (BatchCall [] calldata calls) external nonReentrant {
 
-        mapping(address => uint256) amountsIn;
-        address[] erc20In;
-
-        for (uint256 i; i < calls.length; i++) {
-            if(calls.assetType == AssetType.ERC20 || calls.assetType == AssetType.SUPPORTED_ERC20) {
-                amountsIn[calls.tokenAddress] += calls.amount;
-                erc20In.push(calls.tokenAddress);
-            }
-        }
-
         uint256 msgValueUsed;
         uint256 msgFeeUsed;
 
         for (uint256 i; i < calls.length; i++) {
-            if (supportedERC20[calls.assetAddress]) calls.assetType = AssetType.SUPPORTED_ERC20;
-            (uint256 fee, uint256 paymentValue) = _beforeTransfer(calls.assetType, calls.recipient, calls.amount, 0, address(0));
-            if (calls.assetType == AssetType.Native) {
-                _sendTo(calls.recipient, paymentValue, calls.message);
+            if (supportedERC20[calls[i].assetAddress]) calls[i].assetType = AssetType.SUPPORTED_ERC20;
+            if (calls[i].assetType == AssetType.Native) {
+                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, calls[i].amount, 0, address(0));
+                _sendCoin(calls[i].recipient, paymentValue);
                 msgValueUsed += paymentValue;
                 msgFeeUsed += fee;
-            } else if (calls.assetType == AssetType.ERC20) {
-                _sendERC20To(calls.recipient, paymentValue, calls.tokenAddress, calls.message);
-            else if (calls.assetType == AssetType.SUPPORTED_ERC20) {
-                _sendERC20To(calls.recipient, paymentValue, calls.tokenAddress, calls.message);
+            } else if (calls[i].assetType == AssetType.ERC20) {
+                uint256 amountIn =  _sendERC20From(call[i].amount, msg.sender, address(this), calls[i].tokenAddress);
+                /** ToDo: check if amount should be amountIn, as fee is taken as constant native coin */
+                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
+                _sendERC20(paymentValue, calls[i].recipient, calls[i].tokenAddress);
                 msgFeeUsed += fee;
-            } else if (calls.assetType == AssetType.ERC721) {
-                _sendERC721To(calls.recipient, calls.tokenAddress, calls.tokenId, calls.message);
+            else if (calls[i].assetType == AssetType.SUPPORTED_ERC20) {
+                uint256 amountIn =  _sendERC20From(call[i].amount, msg.sender, address(this), calls[i].tokenAddress);
+                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
+                _sendERC20(paymentValue, calls[i].recipient, calls[i].tokenAddress);
+            } else if (calls[i].assetType == AssetType.ERC721) {
+                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, calls[i].amount, call[i].tokenId, calls[i].tokenAddress);
+                _sendERC721(calls[i].tokenId, msg.sender, calls[i].recipient, calls[i].tokenAddress);
                 msgFeeUsed += fee;
-            } else if (calls.assetType == AssetType.ERC1155) {
-                /** ToDo: check amount */
-                _sendERC1155To(calls.recipient, calls.amount, calls.tokenAddress, calls.tokenId, calls.message);
+            } else if (calls[i].assetType == AssetType.ERC1155) {
+                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, calls[i].amount, call[i].tokenId, calls[i].tokenAddress);
+                _sendERC1155(calls[i].tokenId, calls[i].amount, msg.sender, calls[i].recipient, calls[i].tokenAddress);
                 msgFeeUsed += fee;
             } else {
                 revert tipping__UnsupportedAssetType;
             }
+            emit TipMessage(calls[i].recipient, calls[i].message, msg.sender, calls[i].assetType, calls[i].tokenAddress, calls[i].assetId, paymentValue, fee);
         }
 
         if (msgValueUsed + msgFeeUsed != msg.value) {
-            revert tipping__MsgValueMismatch(mgs.value, msgValueUsed);
+            revert FeeHigherThanProvidedNativeCurrency();
         }
     }
 
