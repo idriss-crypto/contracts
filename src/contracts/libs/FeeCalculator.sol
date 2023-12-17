@@ -163,6 +163,7 @@ abstract contract FeeCalculator is Ownable {
      * @return fee - processing fee, few percent of slippage is allowed
      * @return value - payment value after subtracting fee
      * ToDo: what happens in the case of ERC20, ERC721, ERC1155 => pass msg.value AND amount? what about batch calls?
+     * the below check for slippage breaks for SUPPORTED_ERC20, as _valueToSplit is token, but fee is coin
      */
     function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (bool isFeeNative, uint256 fee, uint256 value) {
         uint256 minimalPaymentFee = _getMinimumFee();
@@ -177,14 +178,15 @@ abstract contract FeeCalculator is Ownable {
         } else {
             fee = paymentFee;
         }
-        if (_valueToSplit < fee) {
+        /** make check for minimum fee requirement with ERC20s in sending function */
+        if (_assetType != AssetType.ERC20 && _valueToSplit < fee) {
             revert ValueSentTooSmall();
         }
 
         if (FEE_assetType === AssetType.SUPPORTED_ERC20) {
             isFeeNative = false;
         }
-        if (FEE_TYPE_MAPPING[_assetType] === FeeType.Percentage {
+        if (FEE_TYPE_MAPPING[_assetType] === FeeType.Percentage) {
             value = _valueToSplit - fee;
         } else {
             value = _valueToSplit;
