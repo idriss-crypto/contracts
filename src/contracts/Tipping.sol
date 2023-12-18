@@ -21,6 +21,7 @@ error UnknownFunctionSelector();
 error WithdrawFailed();
 error RenounceOwnershipNotAllowed();
 error FeeHigherThanProvidedNativeCurrency();
+error UnsupportedAssetType();
 
 
 /**
@@ -270,8 +271,10 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
                 msgFeeUsed += fee;
             } else if (calls[i].assetType == AssetType.ERC20) {
                 uint256 amountIn =  _sendERC20From(call[i].amount, msg.sender, address(this), calls[i].tokenAddress);
-                /** ToDo: check if amount should be amountIn, as fee is taken as constant native coin */
-                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
+                /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
+                (, uint256 fee,) = _beforeTransfer(calls[i].assetType, calls[i].recipient, msg.value, 0, calls[i].tokenAddress);
+                /** forward 100% of incoming token, as fee is taken in native currency */
+                uint256 paymentValue = amountIn;
                 _sendERC20(paymentValue, calls[i].recipient, calls[i].tokenAddress);
                 msgFeeUsed += fee;
             else if (calls[i].assetType == AssetType.SUPPORTED_ERC20) {
@@ -279,20 +282,22 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
                 (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
                 _sendERC20(paymentValue, calls[i].recipient, calls[i].tokenAddress);
             } else if (calls[i].assetType == AssetType.ERC721) {
-                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, calls[i].amount, call[i].tokenId, calls[i].tokenAddress);
+                /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
+                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, msg.value, call[i].tokenId, calls[i].tokenAddress);
                 _sendERC721(calls[i].tokenId, msg.sender, calls[i].recipient, calls[i].tokenAddress);
                 msgFeeUsed += fee;
             } else if (calls[i].assetType == AssetType.ERC1155) {
-                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, calls[i].amount, call[i].tokenId, calls[i].tokenAddress);
+                /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
+                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, msg.value, call[i].tokenId, calls[i].tokenAddress);
                 _sendERC1155(calls[i].tokenId, calls[i].amount, msg.sender, calls[i].recipient, calls[i].tokenAddress);
                 msgFeeUsed += fee;
             } else {
-                revert tipping__UnsupportedAssetType;
+                revert UnsupportedAssetType();
             }
             emit TipMessage(calls[i].recipient, calls[i].message, msg.sender, calls[i].assetType, calls[i].tokenAddress, calls[i].assetId, paymentValue, fee);
         }
 
-        if (msgValueUsed + msgFeeUsed != msg.value) {
+        if (msgValueUsed + msgFeeUsed < msg.value) {
             revert FeeHigherThanProvidedNativeCurrency();
         }
     }
