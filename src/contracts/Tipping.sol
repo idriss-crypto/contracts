@@ -122,8 +122,6 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
                     _attestDonor(_recipient);
                 }
             } else {
-                // overwriting fee type for supported erc20s
-                if (supportedERC20[_assetContractAddress]) _assetType = AssetType.SUPPORTED_ERC20;
                 (isFeeNative, fee, value) = _splitPayment(_amount, _assetType);
             }
         }
@@ -165,15 +163,31 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         address _tokenContractAddr,
         string memory _message
     ) external override nonReentrant {
-        uint256 amountIn =  _sendERC20From(_amount, msg.sender, address(this), _tokenContractAddr);
+        uint256 amountOut;
+        uint256 amountIn = _sendERC20From(_amount, msg.sender, address(this), _tokenContractAddr);
+        /** Case: ERC20, constant fee in native */
+        uint256 amountToCheck = msg.value;
+        AssetType assetType = AssetType.ERC20;
 
-        (bool isFeeNative, uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.ERC20, _recipient, amountIn, 0, _tokenContractAddr);
+        // overwriting fee type for supported erc20s
+        if (supportedERC20[_tokenContractAddr]) {
+            /** Case: SUPPORTED_ERC20, % fee of amountIn */
+            assetType = AssetType.SUPPORTED_ERC20;
+            amountToCheck = amountIn;
+        }
+        /** Case: ERC20: paymentValue calculated as with ERC721, ERC1155 */
+        /** Case: SUPPORTED_ERC20: paymentValue (%) calculated as with Native */
+        (bool isFeeNative, uint256 fee, uint256 paymentValue) = _beforeTransfer(assetType, _recipient, amountToCheck, 0, _tokenContractAddr);
 
-        if (isFeeNative && fee > msg.value) revert FeeHigherThanProvidedNativeCurrency();
+        if (assetType === AssetType.SUPPORTED_ERC20) {
+            amountOut = paymentValue
+        } else {
+            amountOut = amountIn
+        }
 
-        _sendERC20(paymentValue, _recipient, _tokenContractAddr);
+        _sendERC20(amountOut, _recipient, _tokenContractAddr);
 
-        emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC20, _tokenContractAddr, 0, paymentValue, fee);
+        emit TipMessage(_recipient, _message, msg.sender, assetType, _tokenContractAddr, 0, amountOut, fee);
     }
 
     /**
