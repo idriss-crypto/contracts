@@ -90,11 +90,11 @@ contract SendToHash is
         setStateForSendToAnyone(_IDrissHash, paymentValue, fee, _assetType, _assetContractAddress, _assetId);
 
         if (_assetType == AssetType.ERC20) {
-            _sendTokenAssetFrom(paymentValue, msg.sender, address(this), _assetContractAddress);
+            _sendERC20From(paymentValue, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.ERC721) {
-            _sendNFTAsset(_assetId, msg.sender, address(this), _assetContractAddress);
+            _sendERC721(_assetId, msg.sender, address(this), _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {
-            _sendERC1155Asset(_assetId, paymentValue, msg.sender, address(this), _assetContractAddress);
+            _sendERC1155(_assetId, paymentValue, msg.sender, address(this), _assetContractAddress);
         }
 
         emit AssetTransferred(_IDrissHash, msg.sender, adjustedAssetAddress, paymentValue, _assetType, _message);
@@ -185,7 +185,7 @@ contract SendToHash is
                 AssetIdAmount[] memory assetAmountIds = beneficiaryAsset.assetIdAmounts[payers[i]];
                 delete beneficiaryAsset.assetIdAmounts[payers[i]];
                 for (uint256 j = 0; j < assetAmountIds.length; ++j) {
-                    _sendERC1155Asset(assetAmountIds[j].id, assetAmountIds[j].amount, address(this), ownerIDrissAddr, _assetContractAddress);
+                    _sendERC1155(assetAmountIds[j].id, assetAmountIds[j].amount, address(this), ownerIDrissAddr, _assetContractAddress);
                 }
             }
         }
@@ -195,7 +195,7 @@ contract SendToHash is
         if (_assetType == AssetType.Native) {
             _sendCoin(ownerIDrissAddr, amountToClaim);
         } else if (_assetType == AssetType.ERC20) {
-            _sendTokenAsset(amountToClaim, ownerIDrissAddr, _assetContractAddress);
+            _sendERC20(amountToClaim, ownerIDrissAddr, _assetContractAddress);
         }
 
         emit AssetClaimed(hashWithPassword, ownerIDrissAddr, adjustedAssetAddress, amountToClaim, _assetType);
@@ -250,7 +250,7 @@ contract SendToHash is
         if (_assetType == AssetType.Native) {
             _sendCoin(msg.sender, amountToRevert);
         } else if (_assetType == AssetType.ERC20) {
-            _sendTokenAsset(amountToRevert, msg.sender, _assetContractAddress);
+            _sendERC20(amountToRevert, msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.ERC721) {
             _sendNFTAssetBatch(assetIds, address(this), msg.sender, _assetContractAddress);
         } else if (_assetType == AssetType.ERC1155) {

@@ -22,6 +22,7 @@ error WithdrawFailed();
 error RenounceOwnershipNotAllowed();
 error FeeHigherThanProvidedNativeCurrency();
 error UnsupportedAssetType();
+error PayingWithNative();
 
 
 /**
@@ -40,20 +41,22 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
     using SafeERC20 for IERC20;
 
     struct BatchCall {
-        AssetType assetType,
-        address recipient,
-        uint256 amount,
-        uint256 tokenId,
-        address tokenAddress,
-        string calldata message
+        AssetType assetType;
+        address recipient;
+        uint256 amount;
+        uint256 tokenId;
+        address tokenAddress;
+        string message;
     }
 
-    struct MultiSendAssetHelper {
-        AssetType assetType,
-        address assetAddress,
-        uint256 tokenId,
-        uint256 amountIn,
-        uint256 totalFee
+    struct AdjustedBatchCall {
+        AssetType assetType;
+        address recipient;
+        uint256 amount;
+        uint256 tokenId;
+        address tokenAddress;
+        string message;
+        uint256 nativeAmount;
     }
 
     constructor(
@@ -113,9 +116,9 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         AssetType _assetType,
         address _recipient,
         uint256 _amount,
-        uint256 _assetId,
+        uint256 _tokenId,
         address _assetContractAddress
-        ) internal returns (bool isFeeNative, uint256 fee, uint256 value) {
+        ) internal returns (uint256 fee, uint256 value) {
             if (publicGoods[_recipient]) {
                 value = _amount;
                 fee;
@@ -123,7 +126,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
                     _attestDonor(_recipient);
                 }
             } else {
-                (isFeeNative, fee, value) = _splitPayment(_amount, _assetType);
+                (fee, value) = _splitPayment(_amount, _assetType);
             }
         }
 
@@ -140,7 +143,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         address _recipient,
         string memory _message
     ) external payable override nonReentrant {
-        (,uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.Native, _recipient, msg.value, 0, address(0));
+        (uint256 fee, uint256 paymentValue) = _beforeTransfer(AssetType.Native, _recipient, msg.value, 0, address(0));
 
         _sendCoin(_recipient, paymentValue);
 
@@ -163,7 +166,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         uint256 _amount,
         address _tokenContractAddr,
         string memory _message
-    ) external override nonReentrant {
+    ) external payable override nonReentrant {
         uint256 amountOut;
         uint256 amountIn = _sendERC20From(_amount, msg.sender, address(this), _tokenContractAddr);
         /** Case: ERC20, constant fee in native */
@@ -175,15 +178,16 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
             /** Case: SUPPORTED_ERC20, % fee of amountIn */
             assetType = AssetType.SUPPORTED_ERC20;
             amountToCheck = amountIn;
+            if (msg.value > 0) revert PayingWithNative();
         }
         /** Case: ERC20: paymentValue calculated as with ERC721, ERC1155 */
         /** Case: SUPPORTED_ERC20: paymentValue (%) calculated as with Native */
-        (bool isFeeNative, uint256 fee, uint256 paymentValue) = _beforeTransfer(assetType, _recipient, amountToCheck, 0, _tokenContractAddr);
+        (uint256 fee, uint256 paymentValue) = _beforeTransfer(assetType, _recipient, amountToCheck, 0, _tokenContractAddr);
 
-        if (assetType === AssetType.SUPPORTED_ERC20) {
-            amountOut = paymentValue
+        if (assetType == AssetType.SUPPORTED_ERC20) {
+            amountOut = paymentValue;
         } else {
-            amountOut = amountIn
+            amountOut = amountIn;
         }
 
         _sendERC20(amountOut, _recipient, _tokenContractAddr);
@@ -205,7 +209,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         string memory _message
     ) external payable override nonReentrant {
 
-        (,uint256 fee,) = _beforeTransfer(AssetType.ERC721, _recipient, msg.value, _tokenId, _nftContractAddress);
+        (uint256 fee,) = _beforeTransfer(AssetType.ERC721, _recipient, msg.value, _tokenId, _nftContractAddress);
 
         _sendERC721(_tokenId, msg.sender, _recipient, _nftContractAddress);
 
@@ -215,36 +219,52 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
     /**
      * @notice Send a tip in ERC1155 token, charging a small fee
      * @param _recipient The address of the recipient of the tip
-     * @param _assetId The ID of the ERC1155 token being sent as a tip
+     * @param _tokenId The ID of the ERC1155 token being sent as a tip
      * @param _amount The amount of the ERC1155 token being sent as a tip
      * @param _assetContractAddress The address of the ERC1155 token contract
      * @param _message The message accompanying the tip
      */
     function sendERC1155To(
         address _recipient,
-        uint256 _assetId,
+        uint256 _tokenId,
         uint256 _amount,
         address _assetContractAddress,
         string memory _message
     ) external payable override nonReentrant {
 
-        (,uint256 fee,) = _beforeTransfer(AssetType.ERC1155, _recipient, msg.value, _assetId, _assetContractAddress);
+        (uint256 fee,) = _beforeTransfer(AssetType.ERC1155, _recipient, msg.value, _tokenId, _assetContractAddress);
 
-        _sendERC1155(_assetId, _amount, msg.sender, _recipient, _assetContractAddress);
+        _sendERC1155(_tokenId, _amount, msg.sender, _recipient, _assetContractAddress);
 
-        emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC1155, _assetContractAddress, _assetId, msg.value, fee);
+        emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC1155, _assetContractAddress, _tokenId, msg.value, fee);
     }
 
-/** FIXME: unfinished */
-    function calculateBatchFee(BatchCall [] calldata calls) external view returns (MultiSendAssetHelper[] memory) {
-        MultiSendAssetHelper[] memory resultArray;
-        mapping(address => MultiSendAssetHelper) memory resultMapping;
+
+    function calculateBatchFee(BatchCall [] calldata calls) external view returns (AdjustedBatchCall[] memory resultCalls) {
+        resultCalls = new AdjustedBatchCall[](calls.length);
 
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].assetType == AssetType.Native) resultMapping[calls.tokenAddress(0)].amountIn += calls.amount;
-            else {
-                (uint256 fee, uint256 value) = _splitPayment(calls.amount, calls.assetType);
-                resultMapping[calls.tokenAddress].amountIn += fee;
+            AssetType assetType = calls[i].assetType;
+            if (supportedERC20[calls[i].tokenAddress]) assetType = AssetType.SUPPORTED_ERC20;
+
+            // Copying data from the original call
+            resultCalls[i].assetType = assetType;
+            resultCalls[i].recipient = calls[i].recipient;
+            resultCalls[i].tokenId = calls[i].tokenId;
+            resultCalls[i].tokenAddress = calls[i].tokenAddress;
+            resultCalls[i].message = calls[i].message;
+
+            uint256 paymentFee = getPaymentFee(calls[i].amount, assetType);
+
+            if (assetType == AssetType.Native){
+                resultCalls[i].nativeAmount = resultCalls[i].amount + paymentFee;
+                resultCalls[i].amount = resultCalls[i].amount + paymentFee;
+            } else if (assetType == AssetType.SUPPORTED_ERC20){
+                resultCalls[i].amount = resultCalls[i].amount + paymentFee;
+            } else if (assetType == AssetType.ERC20 || assetType == AssetType.ERC721 || assetType == AssetType.ERC1155){
+                resultCalls[i].nativeAmount = paymentFee;
+            } else {
+                revert UnsupportedAssetType();
             }
         }
     }
@@ -257,44 +277,48 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
  * such as tokens with rebasing functionality or fee-on-transfer token.
  * Usage of such tokens may result in a loss of assets.
 */
-    function batchSendTo (BatchCall [] calldata calls) external nonReentrant {
+    function batchSendTo (BatchCall [] calldata calls) external payable nonReentrant {
 
+        uint256 paymentValue;
+        uint256 fee;
         uint256 msgValueUsed;
         uint256 msgFeeUsed;
 
         for (uint256 i; i < calls.length; i++) {
-            if (supportedERC20[calls[i].assetAddress]) calls[i].assetType = AssetType.SUPPORTED_ERC20;
-            if (calls[i].assetType == AssetType.Native) {
-                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, calls[i].amount, 0, address(0));
+
+            AssetType assetType = calls[i].assetType;
+            if (supportedERC20[calls[i].tokenAddress]) assetType = AssetType.SUPPORTED_ERC20;
+            if (assetType == AssetType.Native) {
+                (fee, paymentValue) = _beforeTransfer(assetType, calls[i].recipient, calls[i].amount, 0, address(0));
                 _sendCoin(calls[i].recipient, paymentValue);
                 msgValueUsed += paymentValue;
                 msgFeeUsed += fee;
-            } else if (calls[i].assetType == AssetType.ERC20) {
-                uint256 amountIn =  _sendERC20From(call[i].amount, msg.sender, address(this), calls[i].tokenAddress);
-                /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
-                (, uint256 fee,) = _beforeTransfer(calls[i].assetType, calls[i].recipient, msg.value, 0, calls[i].tokenAddress);
-                /** forward 100% of incoming token, as fee is taken in native currency */
-                uint256 paymentValue = amountIn;
+            } else if (assetType == AssetType.ERC20 || assetType == AssetType.SUPPORTED_ERC20) {
+
+                uint256 amountIn =  _sendERC20From(calls[i].amount, msg.sender, address(this), calls[i].tokenAddress);
+                if (assetType == AssetType.ERC20) {
+                    /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
+                    (fee,) = _beforeTransfer(assetType, calls[i].recipient, msg.value, 0, calls[i].tokenAddress);
+                    /** forward 100% of incoming token, as fee is taken in native currency */
+                    paymentValue = amountIn;
+                } else {
+                    (fee, paymentValue) = _beforeTransfer(assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
+                    msgFeeUsed += fee;
+                }
                 _sendERC20(paymentValue, calls[i].recipient, calls[i].tokenAddress);
-                msgFeeUsed += fee;
-            else if (calls[i].assetType == AssetType.SUPPORTED_ERC20) {
-                uint256 amountIn =  _sendERC20From(call[i].amount, msg.sender, address(this), calls[i].tokenAddress);
-                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
-                _sendERC20(paymentValue, calls[i].recipient, calls[i].tokenAddress);
-            } else if (calls[i].assetType == AssetType.ERC721) {
+            } else if (assetType == AssetType.ERC721 || assetType == AssetType.ERC1155) {
                 /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
-                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, msg.value, call[i].tokenId, calls[i].tokenAddress);
-                _sendERC721(calls[i].tokenId, msg.sender, calls[i].recipient, calls[i].tokenAddress);
-                msgFeeUsed += fee;
-            } else if (calls[i].assetType == AssetType.ERC1155) {
-                /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
-                (, uint256 fee, uint256 paymentValue) = _beforeTransfer(calls[i].assetType, calls[i].recipient, msg.value, call[i].tokenId, calls[i].tokenAddress);
-                _sendERC1155(calls[i].tokenId, calls[i].amount, msg.sender, calls[i].recipient, calls[i].tokenAddress);
+                (fee, paymentValue) = _beforeTransfer(assetType, calls[i].recipient, msg.value, calls[i].tokenId, calls[i].tokenAddress);
+                if (assetType == AssetType.ERC721) {
+                    _sendERC721(calls[i].tokenId, msg.sender, calls[i].recipient, calls[i].tokenAddress);
+                } else {
+                    _sendERC1155(calls[i].tokenId, calls[i].amount, msg.sender, calls[i].recipient, calls[i].tokenAddress);
+                }
                 msgFeeUsed += fee;
             } else {
                 revert UnsupportedAssetType();
             }
-            emit TipMessage(calls[i].recipient, calls[i].message, msg.sender, calls[i].assetType, calls[i].tokenAddress, calls[i].assetId, paymentValue, fee);
+            emit TipMessage(calls[i].recipient, calls[i].message, msg.sender, calls[i].assetType, calls[i].tokenAddress, calls[i].tokenId, paymentValue, fee);
         }
 
         if (msgValueUsed + msgFeeUsed < msg.value) {
@@ -349,14 +373,14 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
      * @notice Add supported erc20 address with percentage fee structure
      */
     function addSupportedERC20(address erc20Address) external onlyOwner nonReentrant {
-        supportedERC20[publicGoodAddress] = true;
+        supportedERC20[erc20Address] = true;
     }
 
     /**
      * @notice ERC20 returns to minimum amount fee structure
      */
     function deleteSupportedERC20(address erc20Address) external onlyOwner nonReentrant {
-        delete supportedERC20[publicGoodAddress];
+        delete supportedERC20[erc20Address];
     }
 
     /**

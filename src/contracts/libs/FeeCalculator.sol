@@ -67,7 +67,7 @@ abstract contract FeeCalculator is Ownable {
         uint256 nativePriceMultiplier = 10**FALLBACK_DECIMALS;
 
         try NATIVE_USD_PRICE_FEED.latestRoundData() returns
-            (uint80 roundId, int256 _latestPrice, uint256, uint256 _lastUpdatedAt, uint80) {
+            (uint80, int256 _latestPrice, uint256, uint256 _lastUpdatedAt, uint80) {
             if (_latestPrice > 0 &&
                 _lastUpdatedAt != 0 &&
                 (block.timestamp - _lastUpdatedAt <= NATIVE_USD_STALE_THRESHOLD)) {
@@ -145,7 +145,7 @@ abstract contract FeeCalculator is Ownable {
 
     // percentage fee post incoming transaction to get % from original amount
     function _getPercentageFeePost(uint256 _value) internal view returns (uint256) {
-        return _value - (_value * PAYMENT_FEE_PERCENTAGE_DENOMINATOR / (PAYMENT_FEE_PERCENTAGE_DENOMINATOR + PAYMENT_FEE_PERCENTAGE))
+        return _value - (_value * PAYMENT_FEE_PERCENTAGE_DENOMINATOR / (PAYMENT_FEE_PERCENTAGE_DENOMINATOR + PAYMENT_FEE_PERCENTAGE));
     }
 
     function _getMinimumFeeOracle() internal view returns (uint256) {
@@ -164,10 +164,9 @@ abstract contract FeeCalculator is Ownable {
      * @return value - payment value after subtracting fee
      * ToDo: what about batch calls?
      */
-    function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (bool isFeeNative, uint256 fee, uint256 value) {
+    function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (uint256 fee, uint256 value) {
         uint256 minimalPaymentFee = _getMinimumFee();
         uint256 paymentFee = getPaymentFeePost(_valueToSplit, _assetType);
-        isFeeNative = true;
 
         // we accept slippage of native coin price if fee type is not percentage - it this case we always get % no matter dollar price
         if (FEE_TYPE_MAPPING[_assetType] != FeeType.Percentage
@@ -182,10 +181,7 @@ abstract contract FeeCalculator is Ownable {
             revert ValueSentTooSmall();
         }
 
-        if (FEE_assetType === AssetType.SUPPORTED_ERC20) {
-            isFeeNative = false;
-        }
-        if (FEE_TYPE_MAPPING[_assetType] === FeeType.Percentage) {
+        if (FEE_TYPE_MAPPING[_assetType] == FeeType.Percentage) {
             value = _valueToSplit - fee;
         } else {
             value = _valueToSplit;
