@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import { AssetType, FeeType } from "../enums/IDrissEnums.sol";
+import { BatchCall, AdjustedBatchCall } from "../structs/IDrissStructs.sol";
 
 error AddressIsNull();
 error ValueSentTooSmall();
@@ -17,6 +18,8 @@ error PaymentFeeTooSmall();
 error DenominatorTooSmall();
 error MinimalFeeTooBig();
 error MinimalFeePercentageTooBig();
+error UnsupportedAssetType();
+
 
 /**
  * @title FeeCalculator
@@ -133,6 +136,35 @@ abstract contract FeeCalculator is Ownable {
 
         // default case - PercentageOrConstantMaximum
         if (percentageFee > minimumPaymentFee) return percentageFee; else return minimumPaymentFee;
+    }
+
+    function calculateBatchFee(BatchCall [] calldata calls) external view returns (AdjustedBatchCall[] memory resultCalls) {
+        resultCalls = new AdjustedBatchCall[](calls.length);
+
+        for (uint256 i; i < calls.length; i++) {
+            AssetType assetType = calls[i].assetType;
+            if (supportedERC20[calls[i].tokenAddress]) assetType = AssetType.SUPPORTED_ERC20;
+
+            // Copying data from the original call
+            resultCalls[i].assetType = assetType;
+            resultCalls[i].recipient = calls[i].recipient;
+            resultCalls[i].tokenId = calls[i].tokenId;
+            resultCalls[i].tokenAddress = calls[i].tokenAddress;
+            resultCalls[i].message = calls[i].message;
+
+            uint256 paymentFee = getPaymentFee(calls[i].amount, assetType);
+
+            if (assetType == AssetType.Native){
+                resultCalls[i].nativeAmount = resultCalls[i].amount + paymentFee;
+                resultCalls[i].amount = resultCalls[i].amount + paymentFee;
+            } else if (assetType == AssetType.SUPPORTED_ERC20){
+                resultCalls[i].amount = resultCalls[i].amount + paymentFee;
+            } else if (assetType == AssetType.ERC20 || assetType == AssetType.ERC721 || assetType == AssetType.ERC1155){
+                resultCalls[i].nativeAmount = paymentFee;
+            } else {
+                revert UnsupportedAssetType();
+            }
+        }
     }
 
 

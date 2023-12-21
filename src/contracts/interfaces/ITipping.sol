@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import { AssetType } from "../enums/IDrissEnums.sol";
+import { BatchCall } from "../structs/IDrissStructs.sol";
 
 interface ITipping {
 
@@ -31,6 +32,8 @@ interface ITipping {
         address _nftContractAddress,
         string memory _message
     ) external payable;
+
+    function batchSendTo (BatchCall [] calldata calls) external payable;
 
     function withdraw() external;
 
