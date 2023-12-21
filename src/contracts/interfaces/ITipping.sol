@@ -43,4 +43,12 @@ interface ITipping {
 
     function deleteAdmin(address _adminAddress) external;
 
+    function addPublicGood(address publicGoodAddress) external;
+
+    function deletePublicGood(address publicGoodAddress) external;
+
+    function addSupportedERC20(address erc20Address) external;
+
+    function deleteSupportedERC20(address erc20Address) external;
+
 }
