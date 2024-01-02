@@ -37,7 +37,6 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
     bool immutable SUPPORTS_CHAINLINK;
     bool immutable SUPPORTS_EAS;
     mapping(address => bool) public admins;
-    mapping(address => bool) public publicGoods;
 
     using SafeERC20 for IERC20;
 
@@ -102,13 +101,11 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
         address _assetContractAddress
         ) internal returns (uint256 fee, uint256 value) {
             if (publicGoods[_recipient]) {
-                value = _amount;
-                fee;
                 if (SUPPORTS_EAS) {
                     _attestDonor(_recipient);
                 }
             } else {
-                (fee, value) = _splitPayment(_amount, _assetType);
+                (fee, value) = _splitPayment(_amount, _assetType, _recipient);
             }
         }
 
@@ -228,7 +225,7 @@ abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipp
  * such as tokens with rebasing functionality or fee-on-transfer token.
  * Usage of such tokens may result in a loss of assets.
 */
-    function batchSendTo (BatchCall [] calldata calls) external payable nonReentrant {
+    function batchSendTo(BatchCall [] calldata calls) external payable nonReentrant {
 
         uint256 paymentValue;
         uint256 fee;

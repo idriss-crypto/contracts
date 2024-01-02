@@ -40,6 +40,7 @@ abstract contract FeeCalculator is Ownable {
     // you have to pass your desired fee types in a constructor deriving this contract
     mapping (AssetType => FeeType) FEE_TYPE_MAPPING;
     mapping (address => bool) supportedERC20;
+    mapping (address => bool) publicGoods;
     uint256 public NATIVE_USD_STALE_THRESHOLD; //  should be the update period
     int256 public FALLBACK_PRICE;
     uint256 public FALLBACK_DECIMALS;
@@ -103,7 +104,10 @@ abstract contract FeeCalculator is Ownable {
      * @param _assetType - asset type, required as ERC20 & ERC721 only take minimal fee
      * @return fee - processing fee, few percent of slippage is allowed
      */
-    function getPaymentFee(uint256 _value, AssetType _assetType) public view returns (uint256) {
+    function getPaymentFee(uint256 _value, AssetType _assetType, address _recipient) public view returns (uint256) {
+        if (publicGoods[_recipient]) {
+            return 0;
+        }
         uint256 minimumPaymentFee = _getMinimumFee();
         uint256 percentageFee = _getPercentageFee(_value);
         FeeType feeType = FEE_TYPE_MAPPING[_assetType];
@@ -124,7 +128,10 @@ abstract contract FeeCalculator is Ownable {
      * @param _assetType - asset type, required as ERC20 & ERC721 only take minimal fee
      * @return fee - processing fee, few percent of slippage is allowed
      */
-    function getPaymentFeePost(uint256 _value, AssetType _assetType) public view returns (uint256) {
+    function getPaymentFeePost(uint256 _value, AssetType _assetType, address _recipient) public view returns (uint256) {
+        if (publicGoods[_recipient]) {
+            return 0;
+        }
         uint256 minimumPaymentFee = _getMinimumFee();
         uint256 percentageFee = _getPercentageFeePost(_value);
         FeeType feeType = FEE_TYPE_MAPPING[_assetType];
@@ -152,7 +159,7 @@ abstract contract FeeCalculator is Ownable {
             resultCalls[i].tokenAddress = calls[i].tokenAddress;
             resultCalls[i].message = calls[i].message;
 
-            uint256 paymentFee = getPaymentFee(calls[i].amount, assetType);
+            uint256 paymentFee = getPaymentFee(calls[i].amount, assetType, calls[i].recipient);
 
             if (assetType == AssetType.Native){
                 resultCalls[i].nativeAmount = resultCalls[i].amount + paymentFee;
@@ -194,11 +201,10 @@ abstract contract FeeCalculator is Ownable {
      * @param _assetType - asset type, as there may be different calculation logic for each type
      * @return fee - processing fee, few percent of slippage is allowed
      * @return value - payment value after subtracting fee
-     * ToDo: what about batch calls?
      */
-    function _splitPayment(uint256 _valueToSplit, AssetType _assetType) internal view returns (uint256 fee, uint256 value) {
+    function _splitPayment(uint256 _valueToSplit, AssetType _assetType, address _recipient) internal view returns (uint256 fee, uint256 value) {
         uint256 minimalPaymentFee = _getMinimumFee();
-        uint256 paymentFee = getPaymentFeePost(_valueToSplit, _assetType);
+        uint256 paymentFee = getPaymentFeePost(_valueToSplit, _assetType, _recipient);
 
         // we accept slippage of native coin price if fee type is not percentage - it this case we always get % no matter dollar price
         if (FEE_TYPE_MAPPING[_assetType] != FeeType.Percentage
