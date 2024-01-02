@@ -52,7 +52,7 @@ abstract contract FeeCalculator is Ownable {
             revert AddressIsNull();
         }
         NATIVE_USD_PRICE_FEED = AggregatorV3Interface(_nativeUsdAggregator);
-        SEQUENCER_UPTIME_FEED = AggregatorV3Interface(_nativeUsdAggregator);
+        SEQUENCER_UPTIME_FEED = AggregatorV3Interface(_sequencerAddress);
         checkSequencer = address(0) != _sequencerAddress;
         NATIVE_USD_STALE_THRESHOLD = _stalenessThreshold;
         FALLBACK_PRICE = _fallbackFeePrice;

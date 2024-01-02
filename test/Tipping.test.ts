@@ -6,9 +6,11 @@ import {
     MockNFT,
     MockToken,
     MaticPriceAggregatorV3Mock,
+    PublicGoodAttesterMockArtifact,
     MockERC1155
 } from '../src/types'
 import MaticPriceAggregatorV3MockArtifact from '../src/artifacts/src/contracts/mocks/MaticPriceAggregatorV3Mock.sol/MaticPriceAggregatorV3Mock.json'
+import PublicGoodAttesterMockArtifact from '../src/artifacts/src/contracts/mocks/PublicGoodAttesterMock.sol/PublicGoodAttesterMock.json'
 import TippingArtifact from '../src/artifacts/src/contracts/Tipping.sol/Tipping.json'
 import MockNFTArtifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockNFT.json'
 import MockERC1155Artifact from '../src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockERC1155.json'
@@ -49,6 +51,8 @@ describe('Tipping contract', async () => {
     let mockERC1155: MockERC1155
     let mockERC1155_2: MockERC1155
     let mockPriceOracle: MaticPriceAggregatorV3Mock
+    let mockSequencer: MaticPriceAggregatorV3Mock
+    let mockPublicGoodAttester: PublicGoodAttesterMock
     let tippingContract: Tipping
     let provider: MockProvider
     let dollarInWei: BigNumber
@@ -122,7 +126,18 @@ describe('Tipping contract', async () => {
         signer2Address = await signer2.getAddress()
         signer3Address = await signer3.getAddress()
         mockPriceOracle = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
-        tippingContract = (await waffle.deployContract(owner, TippingArtifact, [mockPriceOracle.address])) as Tipping
+        mockSequencer = (await waffle.deployContract(owner, MaticPriceAggregatorV3MockArtifact, [])) as MaticPriceAggregatorV3Mock
+        mockPublicGoodAttester = (await waffle.deployContract(owner, PublicGoodAttesterMockArtifact, [])) as PublicGoodAttesterMock
+//         bool _supportsChainlink,
+//         bool _supportsEAS,
+//         address _nativeUsdAggregator,
+//         address _sequencerAddress,
+//         uint256 _stalenessThreshold,
+//         int256 _fallbackPrice,
+//         uint256 _fallbackDecimals,
+//         address _eas,
+//         bytes32 _easSchema
+        tippingContract = (await waffle.deployContract(owner, TippingArtifact, [true, true, mockPriceOracle.address, ZERO_ADDRESS, 0, BigNumber(2300), 18, mockPublicGoodAttester.address, 0x28b73429cc730191053ba7fe21e17253be25dbab480f0c3a369de5217657d925])) as Tipping
         dollarInWei = await mockPriceOracle.dollarToWei()
         PAYMENT_FEE_PERCENTAGE = 10;
         PAYMENT_FEE_PERCENTAGE_DENOMINATOR = 1000;
@@ -226,6 +241,13 @@ describe('Tipping contract', async () => {
             const expectedProtocolFee = weiToSend - (weiToSend * PAYMENT_FEE_PERCENTAGE_DENOMINATOR / (PAYMENT_FEE_PERCENTAGE_DENOMINATOR + PAYMENT_FEE_PERCENTAGE))
             const calculatedFee = await tippingContract.getPaymentFee(weiToSend.sub(expectedProtocolFee), AssetType.Native, signer1Address)
             expect(calculatedFee).to.equal(expectedProtocolFee)
+
+            await tippingContract.addPublicGood(signer2Address)
+            const calculatedFeePG = await tippingContract.getPaymentFee(weiToSend, AssetType.Native, signer2Address)
+            console.log("Calculated fee for PG: ", calculatedFeePG)
+            expect(calculatedFee).to.equal(0)
+            await tippingContract.deletePublicGood(signer2Address)
+
         })
         it('allows for sending native currency', async () => {
             const weiToReceive = 1_000_000
@@ -241,18 +263,20 @@ describe('Tipping contract', async () => {
             expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(calculatedFee))
             expect(signer1BalanceAfter).to.equal(signer1BalanceBefore.add(weiToReceive))
 
-            // Do not take a fee if the recipient is a public good
+            // Do not take a fee if the recipient is a public good, and add attestation
             await tippingContract.addPublicGood(signer2Address)
+            expect(await tippingContract.mockAttestations(owner)).to.be.false
             const signer2BalanceBefore = await provider.getBalance(signer2Address)
             await tippingContract.sendNativeTo(signer2Address, 0, "", { value: weiToReceive })
             const tippingContractBalanceAfter2 = await provider.getBalance(tippingContract.address)
             const signer2BalanceAfter = await provider.getBalance(signer2Address)
             expect(tippingContractBalanceAfter2).to.equal(tippingContractBalanceAfter)
             expect(signer2BalanceAfter).to.equal(signer2BalanceBefore.add(weiToReceive))
+            expect(await tippingContract.mockAttestations(owner)).to.be.true
             await tippingContract.deletePublicGood(signer2Address)
         })
 
-        it('allows sending asset to other address as batch', async () => {
+        it('allows sending asset to other (non-publicGood) address as batch', async () => {
             const weiToReceive1 = 1_000_000
             const weiToReceive2 = 2_500_000
             const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
@@ -285,21 +309,68 @@ describe('Tipping contract', async () => {
 
             await tippingContract.batchSendTo(adjustedBatchSendObject, { value: nativeAmountToSend })
 
+            const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+            const sig1BalanceAfter = await provider.getBalance(signer1Address)
+            const sig2BalanceAfter = await provider.getBalance(signer2Address)
+
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(nativeAmountToSend).sub(weiToReceive).sub(weiToReceive2))
+            expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToReceive1))
+            expect(sig2BalanceAfter).to.equal(sig2BalanceBefore.add(weiToReceive2))
+        })
+
+        it('allows sending asset to other (non-publicGood and publicGoods) address as batch', async () => {
+            const weiToReceive1 = 1_000_000
+            const weiToReceive2 = 2_500_000
+            const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+            const sig1BalanceBefore = await provider.getBalance(signer1Address)
+            const sig2BalanceBefore = await provider.getBalance(signer2Address)
+            await tippingContract.addPublicGood(signer2Address)
+
+            batchObject1 = {
+                assetType: AssetType.Native,
+                recipient: signer1Address,
+                amount: weiToReceive1,
+                tokenId: 0,
+                tokenAddress: ZERO_ADDRESS,
+                message: ""
+            }
+            batchObject2 = {
+                assetType: AssetType.Native,
+                recipient: signer2Address,
+                amount: weiToReceive2,
+                tokenId: 0,
+                tokenAddress: ZERO_ADDRESS,
+                message: ""
+            }
+
+            const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
+            const nativeAmountToSend = BigNumber.from(0);
+            batchSendObject.forEach(call => {
+                nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
+            });
+            const adjustedBatchSendObject = batchSendObject.map(({ nativeAmount, ...rest }) => rest);
+
+            await tippingContract.batchSendTo(adjustedBatchSendObject, { value: nativeAmountToSend })
 
             const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
             const sig1BalanceAfter = await provider.getBalance(signer1Address)
             const sig2BalanceAfter = await provider.getBalance(signer2Address)
 
-            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(weiToSend / 100).add(weiToSend2 / 100))
-            expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToSend - weiToSend / 100))
-            expect(sig2BalanceAfter).to.equal(sig2BalanceBefore.add(weiToSend2 - weiToSend2 / 100))
+            expect(batchSendObject[1].amount).to.equal(weiToReceive2)
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(nativeAmountToSend).sub(weiToReceive).sub(weiToReceive2))
+            expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToReceive1))
+            expect(sig2BalanceAfter).to.equal(sig2BalanceBefore.add(weiToReceive2))
+
+            await tippingContract.deletePublicGood(signer2Address)
         })
 
         it('emits an event', async () => {
-            const weiToSend = 1_000_000
+            const weiToReceive = 1_000_000
+            const calculatedFee = await tippingContract.getPaymentFee(weiToSend, AssetType.Native, signer1Address)
+            const weiToSend = weiToReceive + calculatedFee
             await expect(tippingContract.sendNativeTo(signer1Address, 0, "xyz", { value: weiToSend }))
                 .to.emit(tippingContract, 'TipMessage')
-                .withArgs(signer1Address, "xyz", ownerAddress, ZERO_ADDRESS);
+                .withArgs(signer1Address, "xyz", ownerAddress, AssetType.Native, ZERO_ADDRESS, 0, weiToReceive, calculatedFee);
         })
     })
 
