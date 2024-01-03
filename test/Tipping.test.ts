@@ -379,14 +379,44 @@ describe('Tipping contract', async () => {
             await setupToken()
         })
 
-        it('allows for sending asset to other address', async () => {
+        it('allows for sending unsupported ERC20 asset to other address', async () => {
             const tokensToSend = 1_000_000
+            const calculatedFee = await tippingContract.getPaymentFee(tokensToSend, AssetType.ERC20, signer1Address)
+
+            const sig1BalanceBefore = await mockToken.balanceOf(signer1Address)
+            const tippingContractTokenBalanceBefore = await mockToken.balanceOf(tippingContract.address)
+            const tippingContractNativeBalanceBefore = await provider.getBalance(tippingContract.address)
+
+            await mockToken.increaseAllowance(tippingContract.address, tokensToSend)
+            await tippingContract.sendERC20To(signer1Address, tokensToSend, mockToken.address, "", { value: calculatedFee })
+
+            const sig1BalanceAfter = await mockToken.balanceOf(signer1Address)
+            const tippingContractTokenBalanceAfter = await mockToken.balanceOf(tippingContract.address)
+            const tippingContractNativeBalanceAfter = await provider.getBalance(tippingContract.address)
+
+            expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(tokensToSend))
+            expect(tippingContractTokenBalanceBefore).to.equal(tippingContractTokenBalanceAfter)
+            expect(tippingContractNativeBalanceBefore).to.equal(tippingContractNativeBalanceAfter.add(calculatedFee))
+        })
+
+        it('allows for sending supported ERC20 asset to other address', async () => {
+            await tippingContract.addSupportedERC20(mockToken2.address)
+            const tokensToReceive = 1_000_000
+            const calculatedFee = await tippingContract.getPaymentFee(tokensToSend, AssetType.ERC20, signer1Address)
+            const tokensToSend = tokensToReceive + calculatedFee
+
+            const sig1TokenBalanceBefore = await mockToken.balanceOf(signer1Address)
+            const tippingContractTokenBalanceBefore = await mockToken.balanceOf(tippingContract.address)
 
             await mockToken.increaseAllowance(tippingContract.address, tokensToSend)
             await tippingContract.sendERC20To(signer1Address, tokensToSend, mockToken.address, "")
 
-            expect(await mockToken.balanceOf(signer1Address)).to.equal(tokensToSend - tokensToSend / 100)
-            expect(await mockToken.balanceOf(tippingContract.address)).to.equal(tokensToSend / 100)
+            const sig1TokenBalanceAfter = await mockToken.balanceOf(signer1Address)
+            const tippingContractTokenBalanceAfter = await mockToken.balanceOf(tippingContract.address)
+
+            expect(sig1TokenBalanceAfter).to.equal(sig1BalanceBefore.add(tokensToReceive))
+            expect(tippingContractTokenBalanceAfter).to.equal(tippingContractTokenBalanceBefore.add(calculatedFee))
+            await tippingContract.deleteSupportedERC20(mockToken2.address)
         })
 
         it('allows sending asset to other address as batch', async () => {
