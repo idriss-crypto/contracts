@@ -689,12 +689,15 @@ describe('Tipping contract', async () => {
         })
 
         it('emits an event', async () => {
+
             const tokensToSend = 1_000_000
+            const calculatedFee = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC20, signer1Address)
             await mockToken.increaseAllowance(tippingContract.address, tokensToSend)
 
-            await expect(tippingContract.sendERC20To(signer1Address, tokensToSend, mockToken.address, "xyz"))
+            await expect(tippingContract.sendERC20To(signer1Address, tokensToSend, mockToken.address, "xyz", { value: calculatedFee }))
                 .to.emit(tippingContract, 'TipMessage')
-                .withArgs(signer1Address, "xyz", ownerAddress, mockToken.address);
+                .withArgs(signer1Address, "xyz", ownerAddress, AssetType.ERC20, mockToken.address, 0, tokensToSend, calculatedFee);
+
         })
     })
 
