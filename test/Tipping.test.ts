@@ -593,7 +593,7 @@ describe('Tipping contract', async () => {
             const sig2BalanceBefore = await mockToken.balanceOf(signer2Address)
 
             batchObject1 = {
-                assetType: AssetType.SUPPORTED_ERC20,
+                assetType: AssetType.ERC20,
                 recipient: signer1Address,
                 amount: weiToReceive1,
                 tokenId: 0,
@@ -601,7 +601,7 @@ describe('Tipping contract', async () => {
                 message: ""
             }
             batchObject2 = {
-                assetType: AssetType.SUPPORTED_ERC20,
+                assetType: AssetType.ERC20,
                 recipient: signer2Address,
                 amount: weiToReceive2,
                 tokenId: 0,
@@ -635,7 +635,6 @@ describe('Tipping contract', async () => {
         })
 
         it('allows sending unsupported ERC20 to non-pg and pg addresses as batch', async () => {
-            await tippingContract.addSupportedERC20(mockToken.address)
             await tippingContract.addPublicGood(signer2Address)
 
             const weiToReceive1 = 1_000_000
@@ -646,7 +645,7 @@ describe('Tipping contract', async () => {
             const sig2BalanceBefore = await mockToken.balanceOf(signer2Address)
 
             batchObject1 = {
-                assetType: AssetType.SUPPORTED_ERC20,
+                assetType: AssetType.ERC20,
                 recipient: signer1Address,
                 amount: weiToReceive1,
                 tokenId: 0,
@@ -654,7 +653,7 @@ describe('Tipping contract', async () => {
                 message: ""
             }
             batchObject2 = {
-                assetType: AssetType.SUPPORTED_ERC20,
+                assetType: AssetType.ERC20,
                 recipient: signer2Address,
                 amount: weiToReceive2,
                 tokenId: 0,
@@ -684,7 +683,6 @@ describe('Tipping contract', async () => {
             expect(tippingContractTokenBalanceAfter).to.equal(tippingContractTokenBalanceBefore)
             expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(nativeAmountToSend))
 
-            await tippingContract.deleteSupportedERC20(mockToken.address)
             await tippingContract.deletePublicGood(signer2Address)
         })
 
@@ -707,53 +705,137 @@ describe('Tipping contract', async () => {
         })
 
         it('properly calculates fee when sending asset', async () => {
+            await tippingContract.addPublicGood(signer2Address)
+
             const tokenToSend = 1
             const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+            const calculatedFeeNonPG = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC721, signer1Address)
+            const calculatedFeePG = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC721, signer2Address)
 
-            await mockNFT.approve(tippingContract.address, tokenToSend)
-            await tippingContract.sendERC721To(signer1Address, tokenToSend, mockNFT.address, "", { value: dollarInWei })
+            expect(calculatedFeeNonPG).to.equal(dollarInWei)
+            expect(calculatedFeePG).to.equal(0)
 
-            const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
-            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(dollarInWei))
+            await tippingContract.deletePublicGood(signer2Address)
         })
 
         it('allows for sending asset to other address', async () => {
+            await tippingContract.addPublicGood(signer2Address)
             const tokenToSend = 1
+            const tokenToSend2 = 2
+            const calculatedFeeNonPG = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC721, signer1Address)
+            const calculatedFeePG = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC721, signer2Address)
 
             await mockNFT.approve(tippingContract.address, tokenToSend)
-            await tippingContract.sendERC721To(signer1Address, tokenToSend, mockNFT.address, "", { value: dollarInWei })
+            await tippingContract.sendERC721To(signer1Address, tokenToSend, mockNFT.address, "", { value: calculatedFeeNonPG })
 
-            expect(await mockNFT.ownerOf(tokenToSend)).to.equal(signer1Address)
-        })
-
-        it('allows for sending asset to other address as batch', async () => {
-            const tokenToSend = 2
-            const tokenToSend2 = 3
-
-            await mockNFT.approve(tippingContract.address, tokenToSend)
             await mockNFT.approve(tippingContract.address, tokenToSend2)
-
-            await tippingContract.batch([
-                sendERC721ToBytes(signer1Address, tokenToSend, mockNFT.address, ""),
-                sendERC721ToBytes(signer2Address, tokenToSend2, mockNFT.address, "")
-            ], { value: dollarInWei.mul(2) })
+            await tippingContract.sendERC721To(signer2Address, tokenToSend, mockNFT.address, "", { value: calculatedFeePG })
 
             expect(await mockNFT.ownerOf(tokenToSend)).to.equal(signer1Address)
             expect(await mockNFT.ownerOf(tokenToSend2)).to.equal(signer2Address)
+
+            await tippingContract.deletePublicGood(signer2Address)
+        })
+
+        it('allows for sending asset to non-pg addresses as batch', async () => {
+
+            const tokenToSend3 = 3
+            const tokenToSend4 = 4
+            const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+
+            batchObject1 = {
+                assetType: AssetType.ERC721,
+                recipient: signer1Address,
+                amount: 1,
+                tokenId: 3,
+                tokenAddress: mockNFT.address,
+                message: ""
+            }
+            batchObject2 = {
+                assetType: AssetType.ERC721,
+                recipient: signer2Address,
+                amount: 1,
+                tokenId: 4,
+                tokenAddress: mockNFT.address,
+                message: ""
+            }
+
+            const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
+            const nativeAmountToSend = BigNumber.from(0);
+            batchSendObject.forEach(call => {
+                nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
+            });
+            const adjustedBatchSendObject = batchSendObject.map(({ nativeAmount, ...rest }) => rest);
+
+            await mockNFT.approve(tippingContract.address, tokenToSend3)
+            await mockNFT.approve(tippingContract.address, tokenToSend4)
+
+            await tippingContract.batchSendTo(adjustedBatchSendObject, { value: nativeAmountToSend })
+            const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+
+            expect(await mockNFT.ownerOf(tokenToSend3)).to.equal(signer1Address)
+            expect(await mockNFT.ownerOf(tokenToSend4)).to.equal(signer2Address)
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(dollarInWei*2))
+
+        })
+
+        it('allows for sending asset to other address as batch', async () => {
+            await tippingContract.addPublicGood(signer2Address)
+
+            const tokenToSend5 = 5
+            const tokenToSend6 = 6
+            const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+
+            batchObject1 = {
+                assetType: AssetType.ERC721,
+                recipient: signer1Address,
+                amount: 1,
+                tokenId: 5,
+                tokenAddress: mockNFT.address,
+                message: ""
+            }
+            batchObject2 = {
+                assetType: AssetType.ERC721,
+                recipient: signer2Address,
+                amount: 1,
+                tokenId: 6,
+                tokenAddress: mockNFT.address,
+                message: ""
+            }
+
+            const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
+            const nativeAmountToSend = BigNumber.from(0);
+            batchSendObject.forEach(call => {
+                nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
+            });
+            const adjustedBatchSendObject = batchSendObject.map(({ nativeAmount, ...rest }) => rest);
+
+            await mockNFT.approve(tippingContract.address, tokenToSend5)
+            await mockNFT.approve(tippingContract.address, tokenToSend6)
+
+            await tippingContract.batchSendTo(adjustedBatchSendObject, { value: nativeAmountToSend })
+            const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+
+            expect(await mockNFT.ownerOf(tokenToSend5)).to.equal(signer1Address)
+            expect(await mockNFT.ownerOf(tokenToSend6)).to.equal(signer2Address)
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(dollarInWei))
+
+            await tippingContract.deletePublicGood(signer2Address)
         })
 
         it('reverts when fee is too small', async () => {
             await mockNFT.approve(tippingContract.address, 1)
 
             await expect(tippingContract.sendERC721To(signer1Address, 1, mockNFT.address, "", { value: dollarInWei.div(2) }))
+            // ToDo: change for corrected error message
                 .to.be.revertedWith('Value sent is smaller than minimal fee.')
         })
 
         it('emits an event', async () => {
-            await mockNFT.approve(tippingContract.address, 1)
-            await expect(tippingContract.sendERC721To(signer1Address, 1, mockNFT.address, "xyz", { value: dollarInWei }))
+            await mockNFT.approve(tippingContract.address, 7)
+            await expect(tippingContract.sendERC721To(signer1Address, 7, mockNFT.address, "xyz", { value: dollarInWei }))
                 .to.emit(tippingContract, 'TipMessage')
-                .withArgs(signer1Address, "xyz", ownerAddress, mockNFT.address);
+                .withArgs(signer1Address, "xyz", ownerAddress, AssetType.ERC721, mockNFT.address, 7, 1, dollarInWei);
         })
     })
 
