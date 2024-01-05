@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7; 
-
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+pragma solidity 0.8.19;
 
 error Payments__OnlyContractOwnerCanAddAdmins();
 error Payments__OnlyContractOwnerCanDeleteAdmins();
@@ -15,8 +13,7 @@ error Payments__Ownable_NewContractOwnerIsTheZeroAddress();
 
 contract payments {
 
-    using SafeMath for uint256;
-    address public contractOwner = msg.sender; 
+    address public contractOwner = msg.sender;
     mapping(string => uint256) percent;
     mapping(address => bool) private admins;
     mapping(address => uint256) public balanceOf; 
@@ -81,8 +78,9 @@ contract payments {
         receipts[paymentId_hash] = msg.sender;
         amounts[paymentId_hash] = msg.value;
         if (delegate[delegateHandle] != address(0)) {
-            balanceOf[contractOwner] += msg.value.sub((msg.value.mul(percent[delegateHandle])).div(100));
-            balanceOf[delegate[delegateHandle]] += (msg.value.mul(percent[delegateHandle])).div(100);
+            uint256 delegateAmount = (msg.value * percent[delegateHandle]) / 100;
+            balanceOf[contractOwner] += msg.value - delegateAmount;
+            balanceOf[delegate[delegateHandle]] += delegateAmount;
         } else {
             balanceOf[contractOwner] += msg.value;
         }

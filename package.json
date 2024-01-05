@@ -16,7 +16,7 @@
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.0",
     "@nomiclabs/hardhat-etherscan": "^3.1.2",
-    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@nomiclabs/hardhat-waffle": "^2.0.6",
     "@typechain/ethers-v5": "^7.2.0",
     "@typechain/hardhat": "^2.3.1",
     "@types/chai": "^4.2.22",
@@ -25,7 +25,7 @@
     "chai": "^4.3.6",
     "chai-as-promised": "^7.1.1",
     "dotenv": "^10.0.0",
-    "ethereum-waffle": "^3.4.4",
+    "ethereum-waffle": "^4.0.10",
     "ethers": "^5.5.2",
     "hardhat": "^2.12.0",
     "hardhat-gas-reporter": "^1.0.9",
@@ -35,8 +35,8 @@
     "typescript": "^4.7.3"
   },
   "dependencies": {
-    "@chainlink/contracts": "^0.4.1",
-    "@openzeppelin/contracts": "^4.6.0",
+    "@chainlink/contracts": "^0.8.0",
+    "@openzeppelin/contracts": "^4.3.3",
     "env-cmd": "^10.1.0"
   }
 }

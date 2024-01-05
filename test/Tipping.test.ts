@@ -391,8 +391,8 @@ describe('Tipping contract', async () => {
 
             // Fee in native
             const expectedProtocolFeeNonPGNonSupported = dollarInWei
-            const calculatedFeeNonPGSupported = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC20, signer1Address)
-            expect(calculatedFeeNonPGSupported).to.equal(expectedProtocolFeeNonPGNonSupported)
+            const calculatedFeeNonPGNonSupported = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC20, signer1Address)
+            expect(calculatedFeeNonPGNonSupported).to.equal(expectedProtocolFeeNonPGNonSupported)
 
             const expectedProtocolFeePG = 0
             const calculatedFeePGSupported = await tippingContract.getPaymentFee(tokenToSend.sub(expectedProtocolFeePG), AssetType.SUPPORTED_ERC20, signer2Address)
