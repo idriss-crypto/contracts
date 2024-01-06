@@ -38,9 +38,9 @@ abstract contract FeeCalculator is Ownable {
     uint256 public MINIMAL_PAYMENT_FEE = 1;
     uint256 public MINIMAL_PAYMENT_FEE_DENOMINATOR = 1;
     // you have to pass your desired fee types in a constructor deriving this contract
-    mapping (AssetType => FeeType) FEE_TYPE_MAPPING;
-    mapping (address => bool) supportedERC20;
-    mapping (address => bool) publicGoods;
+    mapping (AssetType => FeeType) public FEE_TYPE_MAPPING;
+    mapping (address => bool) public supportedERC20;
+    mapping (address => bool) public publicGoods;
     uint256 public NATIVE_USD_STALE_THRESHOLD; //  should be the update period
     int256 public FALLBACK_PRICE;
     uint256 public FALLBACK_DECIMALS;

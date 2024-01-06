@@ -32,7 +32,7 @@ error PayingWithNative();
  * @custom:contributor Lennard <@lennardevertz>
  * @notice This is an IDriss Send utility contract for all supported chains.
  */
-abstract contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, MultiAssetSender, FeeCalculator {
+contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, MultiAssetSender, FeeCalculator {
 
     bool immutable SUPPORTS_CHAINLINK;
     bool immutable SUPPORTS_EAS;
