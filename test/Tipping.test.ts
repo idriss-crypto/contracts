@@ -252,11 +252,10 @@ describe('Tipping contract', async () => {
             await tippingContract.deletePublicGood(signer2Address)
 
         })
-        it.only('allows for sending native currency', async () => {
+        it('allows for sending native currency', async () => {
             const weiToReceive = BigNumber.from("1000000");
             const calculatedFee = await tippingContract.getPaymentFee(weiToReceive, AssetType.Native, signer1Address)
             const weiToSend = weiToReceive.add(calculatedFee)
-            console.log("weiToSend :", weiToSend)
 
             const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
             const signer1BalanceBefore = await provider.getBalance(signer1Address)
@@ -264,9 +263,6 @@ describe('Tipping contract', async () => {
             await tippingContract.sendNativeTo(signer1Address, "", { value: weiToSend })
             const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
             const signer1BalanceAfter = await provider.getBalance(signer1Address)
-            console.log("calculatedFee", calculatedFee)
-            console.log("tippingContractBalanceBefore", tippingContractBalanceBefore)
-            console.log("tippingContractBalanceAfter", tippingContractBalanceAfter)
             expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(calculatedFee))
             expect(signer1BalanceAfter).to.equal(signer1BalanceBefore.add(weiToReceive))
 
@@ -276,16 +272,9 @@ describe('Tipping contract', async () => {
             const signer2BalanceBefore = await provider.getBalance(signer2Address)
             const tx = await tippingContract.sendNativeTo(signer2Address, "", { value: weiToReceive })
             const receipt = await tx.wait()
-            console.log(receipt)
-            console.log(receipt.status)
             const tippingContractBalanceAfter2 = await provider.getBalance(tippingContract.address)
             const signer2BalanceAfter = await provider.getBalance(signer2Address)
             const ownerBalanceAfter = await provider.getBalance(ownerAddress)
-            console.log("weiToReceive", weiToReceive)
-            console.log("tippingContractBalanceAfter", tippingContractBalanceAfter)
-            console.log("tippingContractBalanceAfter2", tippingContractBalanceAfter2)
-            console.log("signer2BalanceBefore", signer2BalanceBefore)
-            console.log("signer2BalanceAfter", signer2BalanceAfter)
             expect(tippingContractBalanceAfter2).to.equal(tippingContractBalanceAfter)
             expect(signer2BalanceAfter).to.equal(signer2BalanceBefore.add(weiToReceive))
             await tippingContract.deletePublicGood(signer2Address)

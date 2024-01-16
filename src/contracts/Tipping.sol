@@ -104,9 +104,9 @@ contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, Mult
                 if (SUPPORTS_EAS) {
                     _attestDonor(_recipient);
                 }
-            } else {
-                (fee, value) = _splitPayment(_amount, _assetType, _recipient);
+
             }
+            (fee, value) = _splitPayment(_amount, _assetType, _recipient);
         }
 
     /**
