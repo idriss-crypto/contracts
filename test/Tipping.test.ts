@@ -403,8 +403,6 @@ describe('Tipping contract', async () => {
             // Fee in token balance
             const expectedProtocolFeeNonPGSupported = tokenToSend.mul(PAYMENT_FEE_PERCENTAGE).div(PAYMENT_FEE_PERCENTAGE_DENOMINATOR)
             const calculatedFeeNonPGSupported = await tippingContract.getPaymentFee(tokenToSend, AssetType.SUPPORTED_ERC20, signer1Address)
-//             const expectedProtocolFeeNonPGSupported = tokenToSend - (tokenToSend * PAYMENT_FEE_PERCENTAGE_DENOMINATOR / (PAYMENT_FEE_PERCENTAGE_DENOMINATOR + PAYMENT_FEE_PERCENTAGE))
-//             const calculatedFeeNonPGSupported = await tippingContract.getPaymentFee(tokenToSend - expectedProtocolFeeNonPGSupported, AssetType.SUPPORTED_ERC20, signer1Address)
             expect(calculatedFeeNonPGSupported).to.equal(expectedProtocolFeeNonPGSupported)
 
             // Fee in native
@@ -425,7 +423,7 @@ describe('Tipping contract', async () => {
 
         it('allows for sending unsupported ERC20 asset to other address', async () => {
             await tippingContract.addPublicGood(signer2Address)
-            const tokensToSend = 1_000_000
+            const tokensToSend = BigNumber.from("1000000");
             const calculatedFeeNPG = await tippingContract.getPaymentFee(tokensToSend, AssetType.ERC20, signer1Address)
             // Confirmed to equal 0
             const calculatedFeePG = await tippingContract.getPaymentFee(tokensToSend, AssetType.ERC20, signer2Address)
@@ -440,9 +438,9 @@ describe('Tipping contract', async () => {
             const sig1BalanceAfter = await mockToken.balanceOf(signer1Address)
             const tippingContractTokenBalanceAfter = await mockToken.balanceOf(tippingContract.address)
             const tippingContractNativeBalanceAfter = await provider.getBalance(tippingContract.address)
-            expect(sig1BalanceAfter).to.equal(sig1BalanceBefore + tokensToSend)
+            expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(tokensToSend))
             expect(tippingContractTokenBalanceBefore).to.equal(tippingContractTokenBalanceAfter)
-            expect(tippingContractNativeBalanceBefore).to.equal(tippingContractNativeBalanceAfter.add(calculatedFeeNPG))
+            expect(tippingContractNativeBalanceAfter).to.equal(tippingContractNativeBalanceBefore.add(calculatedFeeNPG))
 
             await mockToken.increaseAllowance(tippingContract.address, tokensToSend)
             await tippingContract.sendERC20To(signer2Address, tokensToSend, mockToken.address, "", { value: calculatedFeePG })
@@ -451,9 +449,9 @@ describe('Tipping contract', async () => {
             const tippingContractTokenBalanceAfter2 = await mockToken.balanceOf(tippingContract.address)
             const tippingContractNativeBalanceAfter2 = await provider.getBalance(tippingContract.address)
 
-            expect(sig2BalanceAfter).to.equal(sig2BalanceBefore + tokensToSend)
+            expect(sig2BalanceAfter).to.equal(sig2BalanceBefore.add(tokensToSend))
             expect(tippingContractTokenBalanceAfter).to.equal(tippingContractTokenBalanceAfter2)
-            expect(tippingContractNativeBalanceBefore).to.equal(tippingContractNativeBalanceAfter + calculatedFeeNPG + calculatedFeePG)
+            expect(tippingContractNativeBalanceAfter2).to.equal(tippingContractNativeBalanceBefore.add(calculatedFeeNPG).add(calculatedFeePG))
 
             await tippingContract.deletePublicGood(signer2Address)
         })
