@@ -287,7 +287,7 @@ describe('Tipping contract', async () => {
             const sig1BalanceBefore = await provider.getBalance(signer1Address)
             const sig2BalanceBefore = await provider.getBalance(signer2Address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.Native,
                 recipient: signer1Address,
                 amount: weiToReceive1,
@@ -295,7 +295,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: ZERO_ADDRESS,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.Native,
                 recipient: signer2Address,
                 amount: weiToReceive2,
@@ -305,7 +305,7 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
             });
@@ -317,7 +317,7 @@ describe('Tipping contract', async () => {
             const sig1BalanceAfter = await provider.getBalance(signer1Address)
             const sig2BalanceAfter = await provider.getBalance(signer2Address)
 
-            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(nativeAmountToSend).sub(weiToReceive).sub(weiToReceive2))
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(nativeAmountToSend).sub(weiToReceive1).sub(weiToReceive2))
             expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToReceive1))
             expect(sig2BalanceAfter).to.equal(sig2BalanceBefore.add(weiToReceive2))
         })
@@ -330,7 +330,7 @@ describe('Tipping contract', async () => {
             const sig2BalanceBefore = await provider.getBalance(signer2Address)
             await tippingContract.addPublicGood(signer2Address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.Native,
                 recipient: signer1Address,
                 amount: weiToReceive1,
@@ -338,7 +338,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: ZERO_ADDRESS,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.Native,
                 recipient: signer2Address,
                 amount: weiToReceive2,
@@ -348,7 +348,7 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
             });
@@ -361,7 +361,7 @@ describe('Tipping contract', async () => {
             const sig2BalanceAfter = await provider.getBalance(signer2Address)
 
             expect(batchSendObject[1].amount).to.equal(weiToReceive2)
-            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(nativeAmountToSend).sub(weiToReceive).sub(weiToReceive2))
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(nativeAmountToSend).sub(weiToReceive1).sub(weiToReceive2))
             expect(sig1BalanceAfter).to.equal(sig1BalanceBefore.add(weiToReceive1))
             expect(sig2BalanceAfter).to.equal(sig2BalanceBefore.add(weiToReceive2))
 
@@ -369,9 +369,9 @@ describe('Tipping contract', async () => {
         })
 
         it('emits an event', async () => {
-            const weiToReceive = 1_000_000
+            const weiToReceive = BigNumber.from("1000000");
             const calculatedFee = await tippingContract.getPaymentFee(weiToReceive, AssetType.Native, signer1Address)
-            const weiToSend = weiToReceive + calculatedFee
+            const weiToSend = weiToReceive.add(calculatedFee)
             await expect(tippingContract.sendNativeTo(signer1Address, "xyz", { value: weiToSend }))
                 .to.emit(tippingContract, 'TipMessage')
                 .withArgs(signer1Address, "xyz", ownerAddress, AssetType.Native, ZERO_ADDRESS, 0, weiToReceive, calculatedFee);
@@ -384,13 +384,27 @@ describe('Tipping contract', async () => {
         })
         it('properly calculates fee when sending asset', async () => {
 
+            const weiToSend = BigNumber.from("1000000");
+            const expectedProtocolFee = weiToSend.mul(PAYMENT_FEE_PERCENTAGE).div(PAYMENT_FEE_PERCENTAGE_DENOMINATOR)
+            const calculatedFee = await tippingContract.getPaymentFee(weiToSend, AssetType.Native, signer1Address)
+            expect(calculatedFee).to.equal(expectedProtocolFee)
+
+            await tippingContract.addPublicGood(signer2Address)
+            const calculatedFeePG = await tippingContract.getPaymentFee(weiToSend, AssetType.Native, signer2Address)
+            expect(calculatedFeePG.toString()).to.equal("0")
+            await tippingContract.deletePublicGood(signer2Address)
+
+
+
             await tippingContract.addSupportedERC20(mockToken2.address)
             await tippingContract.addPublicGood(signer2Address)
 
-            const tokenToSend = 1_000_000
+            const tokenToSend = BigNumber.from("1000000");
             // Fee in token balance
-            const expectedProtocolFeeNonPGSupported = tokenToSend - (tokenToSend * PAYMENT_FEE_PERCENTAGE_DENOMINATOR / (PAYMENT_FEE_PERCENTAGE_DENOMINATOR + PAYMENT_FEE_PERCENTAGE))
-            const calculatedFeeNonPGSupported = await tippingContract.getPaymentFee(tokenToSend - expectedProtocolFeeNonPGSupported, AssetType.SUPPORTED_ERC20, signer1Address)
+            const expectedProtocolFeeNonPGSupported = tokenToSend.mul(PAYMENT_FEE_PERCENTAGE).div(PAYMENT_FEE_PERCENTAGE_DENOMINATOR)
+            const calculatedFeeNonPGSupported = await tippingContract.getPaymentFee(tokenToSend, AssetType.SUPPORTED_ERC20, signer1Address)
+//             const expectedProtocolFeeNonPGSupported = tokenToSend - (tokenToSend * PAYMENT_FEE_PERCENTAGE_DENOMINATOR / (PAYMENT_FEE_PERCENTAGE_DENOMINATOR + PAYMENT_FEE_PERCENTAGE))
+//             const calculatedFeeNonPGSupported = await tippingContract.getPaymentFee(tokenToSend - expectedProtocolFeeNonPGSupported, AssetType.SUPPORTED_ERC20, signer1Address)
             expect(calculatedFeeNonPGSupported).to.equal(expectedProtocolFeeNonPGSupported)
 
             // Fee in native
@@ -399,7 +413,7 @@ describe('Tipping contract', async () => {
             expect(calculatedFeeNonPGNonSupported).to.equal(expectedProtocolFeeNonPGNonSupported)
 
             const expectedProtocolFeePG = 0
-            const calculatedFeePGSupported = await tippingContract.getPaymentFee(tokenToSend - expectedProtocolFeePG, AssetType.SUPPORTED_ERC20, signer2Address)
+            const calculatedFeePGSupported = await tippingContract.getPaymentFee(tokenToSend, AssetType.SUPPORTED_ERC20, signer2Address)
             const calculatedFeePGNonSupported = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC20, signer2Address)
             expect(calculatedFeePGSupported).to.equal(expectedProtocolFeePG)
             expect(calculatedFeePGNonSupported).to.equal(expectedProtocolFeePG)
@@ -490,7 +504,7 @@ describe('Tipping contract', async () => {
             const sig1BalanceBefore = await mockToken.balanceOf(signer1Address)
             const sig2BalanceBefore = await mockToken.balanceOf(signer2Address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.SUPPORTED_ERC20,
                 recipient: signer1Address,
                 amount: weiToReceive1,
@@ -498,7 +512,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: mockToken.address,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.SUPPORTED_ERC20,
                 recipient: signer2Address,
                 amount: weiToReceive2,
@@ -508,7 +522,7 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
             const tokenAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
@@ -543,7 +557,7 @@ describe('Tipping contract', async () => {
             const sig1BalanceBefore = await mockToken.balanceOf(signer1Address)
             const sig2BalanceBefore = await mockToken.balanceOf(signer2Address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.SUPPORTED_ERC20,
                 recipient: signer1Address,
                 amount: weiToReceive1,
@@ -551,7 +565,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: mockToken.address,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.SUPPORTED_ERC20,
                 recipient: signer2Address,
                 amount: weiToReceive2,
@@ -561,8 +575,8 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
-            const tokenAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
+            let tokenAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
                 tokenAmountToSend = tokenAmountToSend.add(BigNumber.from(call.amount));
@@ -596,7 +610,7 @@ describe('Tipping contract', async () => {
             const sig1BalanceBefore = await mockToken.balanceOf(signer1Address)
             const sig2BalanceBefore = await mockToken.balanceOf(signer2Address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.ERC20,
                 recipient: signer1Address,
                 amount: weiToReceive1,
@@ -604,7 +618,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: mockToken.address,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.ERC20,
                 recipient: signer2Address,
                 amount: weiToReceive2,
@@ -614,8 +628,8 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
-            const tokenAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
+            let tokenAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
                 tokenAmountToSend = tokenAmountToSend.add(BigNumber.from(call.amount));
@@ -648,7 +662,7 @@ describe('Tipping contract', async () => {
             const sig1BalanceBefore = await mockToken.balanceOf(signer1Address)
             const sig2BalanceBefore = await mockToken.balanceOf(signer2Address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.ERC20,
                 recipient: signer1Address,
                 amount: weiToReceive1,
@@ -656,7 +670,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: mockToken.address,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.ERC20,
                 recipient: signer2Address,
                 amount: weiToReceive2,
@@ -666,8 +680,8 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
-            const tokenAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
+            let tokenAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
                 tokenAmountToSend = tokenAmountToSend.add(BigNumber.from(call.amount));
@@ -747,7 +761,7 @@ describe('Tipping contract', async () => {
             const tokenToSend4 = 4
             const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.ERC721,
                 recipient: signer1Address,
                 amount: 1,
@@ -755,7 +769,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: mockNFT.address,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.ERC721,
                 recipient: signer2Address,
                 amount: 1,
@@ -765,7 +779,7 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
             });
@@ -790,7 +804,7 @@ describe('Tipping contract', async () => {
             const tokenToSend6 = 6
             const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
 
-            batchObject1 = {
+            const batchObject1 = {
                 assetType: AssetType.ERC721,
                 recipient: signer1Address,
                 amount: 1,
@@ -798,7 +812,7 @@ describe('Tipping contract', async () => {
                 tokenAddress: mockNFT.address,
                 message: ""
             }
-            batchObject2 = {
+            const batchObject2 = {
                 assetType: AssetType.ERC721,
                 recipient: signer2Address,
                 amount: 1,
@@ -808,7 +822,7 @@ describe('Tipping contract', async () => {
             }
 
             const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
-            const nativeAmountToSend = BigNumber.from(0);
+            let nativeAmountToSend = BigNumber.from(0);
             batchSendObject.forEach(call => {
                 nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
             });

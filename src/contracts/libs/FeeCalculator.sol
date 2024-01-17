@@ -155,6 +155,7 @@ abstract contract FeeCalculator is Ownable {
             // Copying data from the original call
             resultCalls[i].assetType = assetType;
             resultCalls[i].recipient = calls[i].recipient;
+            resultCalls[i].amount = calls[i].amount;
             resultCalls[i].tokenId = calls[i].tokenId;
             resultCalls[i].tokenAddress = calls[i].tokenAddress;
             resultCalls[i].message = calls[i].message;
