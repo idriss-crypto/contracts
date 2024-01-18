@@ -192,7 +192,7 @@ contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, Mult
 
         _sendERC721(_tokenId, msg.sender, _recipient, _nftContractAddress);
 
-        emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC721, _nftContractAddress, _tokenId, msg.value, fee);
+        emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC721, _nftContractAddress, _tokenId, 1, fee);
     }
 
     /**
@@ -215,7 +215,7 @@ contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, Mult
 
         _sendERC1155(_tokenId, _amount, msg.sender, _recipient, _assetContractAddress);
 
-        emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC1155, _assetContractAddress, _tokenId, msg.value, fee);
+        emit TipMessage(_recipient, _message, msg.sender, AssetType.ERC1155, _assetContractAddress, _tokenId, _amount, fee);
     }
 
 
@@ -248,18 +248,20 @@ contract Tipping is Ownable, ReentrancyGuard, PublicGoodAttester, ITipping, Mult
                     /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
                     (fee,) = _beforeTransfer(assetType, calls[i].recipient, msg.value, 0, calls[i].tokenAddress);
                     /** forward 100% of incoming token, as fee is taken in native currency */
+                    msgFeeUsed += fee;
                     paymentValue = amountIn;
                 } else {
-                    (fee, paymentValue) = _beforeTransfer(assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
-                    msgFeeUsed += fee;
+                    (, paymentValue) = _beforeTransfer(assetType, calls[i].recipient, amountIn, 0, calls[i].tokenAddress);
                 }
                 _sendERC20(paymentValue, calls[i].recipient, calls[i].tokenAddress);
             } else if (assetType == AssetType.ERC721 || assetType == AssetType.ERC1155) {
                 /** ToDo check: Purposefully use msg.value. Here, msg.value can much bigger than overall fee, so the fee calculation should not throw an error. Fee error thrown below. */
-                (fee, paymentValue) = _beforeTransfer(assetType, calls[i].recipient, msg.value, calls[i].tokenId, calls[i].tokenAddress);
+                (fee,) = _beforeTransfer(assetType, calls[i].recipient, msg.value, calls[i].tokenId, calls[i].tokenAddress);
                 if (assetType == AssetType.ERC721) {
+                    paymentValue = 1;
                     _sendERC721(calls[i].tokenId, msg.sender, calls[i].recipient, calls[i].tokenAddress);
                 } else {
+                    paymentValue = calls[i].amount;
                     _sendERC1155(calls[i].tokenId, calls[i].amount, msg.sender, calls[i].recipient, calls[i].tokenAddress);
                 }
                 msgFeeUsed += fee;
