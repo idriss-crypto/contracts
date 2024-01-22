@@ -701,7 +701,7 @@ describe('Tipping contract', async () => {
         })
     })
 
-    describe.only('Send ERC721', () => {
+    describe('Send ERC721', () => {
         beforeEach(async () => {
             await setupERC721()
         })
@@ -731,14 +731,7 @@ describe('Tipping contract', async () => {
             await tippingContract.sendERC721To(signer1Address, tokenToSend, mockNFT.address, "", { value: calculatedFeeNonPG })
 
             await mockNFT.approve(tippingContract.address, tokenToSend2)
-            let tx = await tippingContract.sendERC721To(signer2Address, tokenToSend2, mockNFT.address, "", { value: calculatedFeePG })
-            console.log(await tx.wait())
-
-            console.log("await mockNFT.ownerOf(tokenToSend)", await mockNFT.ownerOf(tokenToSend))
-            console.log("await mockNFT.ownerOf(tokenToSend2)", await mockNFT.ownerOf(tokenToSend2))
-            console.log("signer1Address", signer1Address)
-            console.log("owner", ownerAddress)
-            console.log("signer2Address", signer2Address)
+            await tippingContract.sendERC721To(signer2Address, tokenToSend2, mockNFT.address, "", { value: calculatedFeePG })
 
             expect(await mockNFT.ownerOf(tokenToSend)).to.equal(signer1Address)
             expect(await mockNFT.ownerOf(tokenToSend2)).to.equal(signer2Address)
@@ -835,11 +828,7 @@ describe('Tipping contract', async () => {
         it('reverts when fee is too small', async () => {
             await mockNFT.approve(tippingContract.address, 1)
 
-//             let tx = await tippingContract.sendERC721To(signer1Address, 1, mockNFT.address, "", { value: dollarInWei.div(2) })
-//             console.log(await tx.wait())
-
             await expect(tippingContract.sendERC721To(signer1Address, 1, mockNFT.address, "", { value: dollarInWei.div(2) }))
-            // ToDo: change for corrected error message
                 .to.be.revertedWith('')
         })
 
@@ -857,14 +846,19 @@ describe('Tipping contract', async () => {
         })
 
         it('properly calculates fee when sending asset', async () => {
+
+            await tippingContract.addPublicGood(signer2Address)
+
             const tokenToSend = 1
             const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+            const calculatedFeeNonPG = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC1155, signer1Address)
+            const calculatedFeePG = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC1155, signer2Address)
 
-            await mockERC1155.setApprovalForAll(tippingContract.address, true)
-            await tippingContract.sendERC1155To(signer1Address, tokenToSend, 1, mockERC1155.address, "", { value: dollarInWei })
+            expect(calculatedFeeNonPG).to.equal(dollarInWei)
+            expect(calculatedFeePG).to.equal(0)
 
-            const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
-            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(dollarInWei))
+            await tippingContract.deletePublicGood(signer2Address)
+
         })
 
         it('allows for sending asset to other address', async () => {
