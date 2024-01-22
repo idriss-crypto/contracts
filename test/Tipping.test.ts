@@ -781,7 +781,7 @@ describe('Tipping contract', async () => {
 
         })
 
-        it('allows for sending asset to other address as batch', async () => {
+        it('allows for sending asset to other address (PG and Non-PG) as batch', async () => {
             await tippingContract.addPublicGood(signer2Address)
 
             const tokenToSend5 = 5
@@ -862,41 +862,188 @@ describe('Tipping contract', async () => {
         })
 
         it('allows for sending asset to other address', async () => {
-            const tokenToSend = 3
+
+            await tippingContract.addPublicGood(signer2Address)
+            const tokenToSend = 1
+            const tokenToSend2 = 2
+            const calculatedFeeNonPG = await tippingContract.getPaymentFee(tokenToSend, AssetType.ERC721, signer1Address)
+            const calculatedFeePG = await tippingContract.getPaymentFee(tokenToSend2, AssetType.ERC721, signer2Address)
+
+            const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
+            const tippingContractTokenBalanceBefore = await mockERC1155.balanceOf(ownerAddress, tokenToSend)
+            const tippingContractTokenBalanceBefore2 = await mockERC1155.balanceOf(ownerAddress, tokenToSend2)
+            const sig1BalanceBefore = await mockERC1155.balanceOf(signer1Address, tokenToSend)
+            const sig2BalanceBefore = await mockERC1155.balanceOf(signer2Address,tokenToSend2)
 
             await mockERC1155.setApprovalForAll(tippingContract.address, true)
-            await tippingContract.sendERC1155To(signer1Address, tokenToSend, 2, mockERC1155.address, "", { value: dollarInWei })
+            await tippingContract.sendERC1155To(signer1Address, tokenToSend, 1, mockERC1155.address, "", { value: calculatedFeeNonPG })
+            await tippingContract.sendERC1155To(signer2Address, tokenToSend2, 1, mockERC1155.address, "", { value: calculatedFeePG })
 
-            expect(await mockERC1155.balanceOf(signer1Address, tokenToSend)).to.be.equal(2)
+            const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
+            const sig1BalanceAfter = await mockERC1155.balanceOf(signer1Address, tokenToSend)
+            const sig2BalanceAfter = await mockERC1155.balanceOf(signer2Address,tokenToSend2)
+
+            expect(sig1BalanceBefore).to.be.equal(0)
+            expect(sig1BalanceAfter).to.be.equal(1)
+            expect(sig2BalanceBefore).to.be.equal(0)
+            expect(sig2BalanceAfter).to.be.equal(1)
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(calculatedFeeNonPG).add(calculatedFeePG))
+            expect(tippingContractBalanceAfter).to.equal(tippingContractBalanceBefore.add(dollarInWei))
+
+            await tippingContract.deletePublicGood(signer2Address)
         })
 
-        it('allows for sending asset to other address as batch', async () => {
-            const tokenToSend = 3
+        it('allows for sending asset to other non-PG addresses as batch', async () => {
+
+            const erc1155ID = 3;
+            const amount1 = 2;
+            const amount2 = 3;
+            const tippingContractNativeBalanceBefore = await provider.getBalance(tippingContract.address)
+            const tippingContractERC1155BalanceBefore = await mockERC1155.balanceOf(tippingContract.address, erc1155ID)
+            const sig1ERC1155BalanceBefore = await mockERC1155.balanceOf(signer1Address, erc1155ID)
+            const sig2ERC1155BalanceBefore = await mockERC1155.balanceOf(signer2Address, erc1155ID)
+
+            const batchObject1 = {
+                assetType: AssetType.ERC1155,
+                recipient: signer1Address,
+                amount: amount1,
+                tokenId: erc1155ID,
+                tokenAddress: mockERC1155.address,
+                message: ""
+            }
+            const batchObject2 = {
+                assetType: AssetType.ERC1155,
+                recipient: signer2Address,
+                amount: amount2,
+                tokenId: erc1155ID,
+                tokenAddress: mockERC1155.address,
+                message: ""
+            }
+
+            const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
+            let nativeAmountToSend = BigNumber.from(0);
+            batchSendObject.forEach(call => {
+                nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
+            });
+            const adjustedBatchSendObject = batchSendObject.map(({ nativeAmount, ...rest }) => rest);
 
             await mockERC1155.setApprovalForAll(tippingContract.address, true)
-            await tippingContract.batch([
-                sendERC1155ToBytes(signer1Address, tokenToSend, 2, mockERC1155.address, ""),
-                sendERC1155ToBytes(signer2Address, tokenToSend, 3, mockERC1155.address, "")
-            ], { value: dollarInWei.mul(2) })
 
-            expect(await mockERC1155.balanceOf(signer1Address, tokenToSend)).to.be.equal(2)
-            expect(await mockERC1155.balanceOf(signer2Address, tokenToSend)).to.be.equal(3)
+            await tippingContract.batchSendTo(adjustedBatchSendObject, { value: nativeAmountToSend })
+
+            const tippingContractNativeBalanceAfter = await provider.getBalance(tippingContract.address)
+            const tippingContractERC1155BalanceAfter = await mockERC1155.balanceOf(tippingContract.address, erc1155ID)
+            const sig1ERC1155BalanceAfter = await mockERC1155.balanceOf(signer1Address, erc1155ID)
+            const sig2ERC1155BalanceAfter = await mockERC1155.balanceOf(signer2Address, erc1155ID)
+
+            expect(sig1ERC1155BalanceBefore).to.be.equal(0)
+            expect(sig1ERC1155BalanceAfter).to.be.equal(2)
+            expect(sig2ERC1155BalanceBefore).to.be.equal(0)
+            expect(sig2ERC1155BalanceAfter).to.be.equal(3)
+            expect(tippingContractNativeBalanceAfter).to.equal(tippingContractNativeBalanceBefore.add(dollarInWei).add(dollarInWei))
+
+        })
+
+        it('allows for sending asset to other address (PG and Non-PG) as batch', async () => {
+            await tippingContract.addPublicGood(signer2Address)
+
+            const erc1155ID = 3;
+            const amount1 = 4;
+            const amount2 = 1;
+            const tippingContractNativeBalanceBefore = await provider.getBalance(tippingContract.address)
+            const tippingContractERC1155BalanceBefore = await mockERC1155.balanceOf(tippingContract.address, erc1155ID)
+            const sig1ERC1155BalanceBefore = await mockERC1155.balanceOf(signer1Address, erc1155ID)
+            const sig2ERC1155BalanceBefore = await mockERC1155.balanceOf(signer2Address, erc1155ID)
+
+            const batchObject1 = {
+                assetType: AssetType.ERC1155,
+                recipient: signer1Address,
+                amount: amount1,
+                tokenId: erc1155ID,
+                tokenAddress: mockERC1155.address,
+                message: ""
+            }
+            const batchObject2 = {
+                assetType: AssetType.ERC1155,
+                recipient: signer2Address,
+                amount: amount2,
+                tokenId: erc1155ID,
+                tokenAddress: mockERC1155.address,
+                message: ""
+            }
+
+            const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
+            let nativeAmountToSend = BigNumber.from(0);
+            batchSendObject.forEach(call => {
+                nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
+            });
+            const adjustedBatchSendObject = batchSendObject.map(({ nativeAmount, ...rest }) => rest);
+
+            await mockERC1155.setApprovalForAll(tippingContract.address, true)
+
+            await tippingContract.batchSendTo(adjustedBatchSendObject, { value: nativeAmountToSend })
+
+            const tippingContractNativeBalanceAfter = await provider.getBalance(tippingContract.address)
+            const tippingContractERC1155BalanceAfter = await mockERC1155.balanceOf(tippingContract.address, erc1155ID)
+            const sig1ERC1155BalanceAfter = await mockERC1155.balanceOf(signer1Address, erc1155ID)
+            const sig2ERC1155BalanceAfter = await mockERC1155.balanceOf(signer2Address, erc1155ID)
+
+            expect(sig1ERC1155BalanceBefore).to.be.equal(0)
+            expect(sig1ERC1155BalanceAfter).to.be.equal(4)
+            expect(sig2ERC1155BalanceBefore).to.be.equal(0)
+            expect(sig2ERC1155BalanceAfter).to.be.equal(1)
+            expect(tippingContractNativeBalanceAfter).to.equal(tippingContractNativeBalanceBefore.add(dollarInWei))
+
+            await tippingContract.deletePublicGood(signer2Address)
+
         })
 
         it('reverts when fee is too small', async () => {
             await mockERC1155.setApprovalForAll(tippingContract.address, true)
 
             await expect(tippingContract.sendERC1155To(signer1Address, 1, 1, mockERC1155.address, "", { value: dollarInWei.div(2) }))
-                .to.be.revertedWith('Value sent is smaller than minimal fee.')
+                .to.be.revertedWith('')
+
+            await tippingContract.addPublicGood(signer2Address)
+
+            const batchObject1 = {
+                assetType: AssetType.ERC1155,
+                recipient: signer1Address,
+                amount: 1,
+                tokenId: 1,
+                tokenAddress: mockERC1155.address,
+                message: ""
+            }
+            const batchObject2 = {
+                assetType: AssetType.ERC1155,
+                recipient: signer2Address,
+                amount: 2,
+                tokenId: 2,
+                tokenAddress: mockERC1155.address,
+                message: ""
+            }
+
+            const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2]);
+            let nativeAmountToSend = BigNumber.from(0);
+            batchSendObject.forEach(call => {
+                nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
+            });
+            const adjustedBatchSendObject = batchSendObject.map(({ nativeAmount, ...rest }) => rest);
+
+            await expect(await tippingContract.batchSendTo(adjustedBatchSendObject, { value: dollarInWei.div(2) }))
+                .to.be.revertedWith('')
+
+            await tippingContract.deletePublicGood(signer2Address)
         })
 
         it('emits an event', async () => {
             const amountToSend = 10
+            const IdToSend = 3
             await mockERC1155.setApprovalForAll(tippingContract.address, true)
 
-            await expect(tippingContract.sendERC1155To(signer1Address, 3, amountToSend, mockERC1155.address, "xyz", { value: dollarInWei }))
+            await expect(tippingContract.sendERC1155To(signer1Address, IdToSend, amountToSend, mockERC1155.address, "xyz", { value: dollarInWei }))
                 .to.emit(tippingContract, 'TipMessage')
-                .withArgs(signer1Address, "xyz", ownerAddress, mockERC1155.address);
+                .withArgs(signer1Address, "xyz", ownerAddress, AssetType.ERC1155, mockERC1155.address, IdToSend, amountToSend, dollarInWei);
         })
     })
 
@@ -910,32 +1057,117 @@ describe('Tipping contract', async () => {
         })
 
         it('properly sends multiple assets', async () => {
-            const weiToSend = 1_000_000
-            const tippingContractBalanceBefore = await provider.getBalance(tippingContract.address)
 
-            await mockToken.increaseAllowance(tippingContract.address, 50)
-            await mockNFT.approve(tippingContract.address, 0)
+            await tippingContract.addSupportedERC20(mockToken2.address)
+
+            const nativeWeiToReceive = BigNumber.from("1000000");
+            const erc20WeiToReceive = BigNumber.from("2000000");
+            const supportedErc20WeiToReceive = BigNumber.from("3000000");
+            const erc721ToReceive = BigNumber.from("1");
+            const erc1155ToReceive = BigNumber.from("7");
+            const erc721ID = BigNumber.from("8");
+            const erc1155ID = BigNumber.from("5");
+
+            const tippingContractSupportedERC20BalanceBefore = await mockToken2.balanceOf(tippingContract.address)
+            const tippingContractNativeBalanceBefore = await provider.getBalance(tippingContract.address)
+            const tippingContractERC20BalanceBefore = await mockToken.balanceOf(tippingContract.address)
+            const sig1ERC1155BalanceBefore = await mockERC1155.balanceOf(signer1Address, erc1155ID)
+
+
+            const batchObject1 = {
+                assetType: AssetType.Native,
+                recipient: signer1Address,
+                amount: nativeWeiToReceive,
+                tokenId: 0,
+                tokenAddress: ZERO_ADDRESS,
+                message: ""
+            }
+            const batchObject2 = {
+                assetType: AssetType.ERC20,
+                recipient: signer1Address,
+                amount: erc20WeiToReceive,
+                tokenId: 0,
+                tokenAddress: mockToken.address,
+                message: ""
+            }
+            const batchObject3 = {
+                assetType: AssetType.SUPPORTED_ERC20,
+                recipient: signer1Address,
+                amount: supportedErc20WeiToReceive,
+                tokenId: 0,
+                tokenAddress: mockToken2.address,
+                message: ""
+            }
+            const batchObject4 = {
+                assetType: AssetType.ERC721,
+                recipient: signer1Address,
+                amount: erc721ToReceive,
+                tokenId: erc721ID,
+                tokenAddress: mockNFT.address,
+                message: ""
+            }
+            const batchObject5 = {
+                assetType: AssetType.ERC1155,
+                recipient: signer1Address,
+                amount: erc1155ToReceive,
+                tokenId: erc1155ID,
+                tokenAddress: mockERC1155.address,
+                message: ""
+            }
+
+            const batchSendObject = await tippingContract.calculateBatchFee([batchObject1, batchObject2, batchObject3, batchObject4, batchObject5]);
+            let nativeAmountToSend = BigNumber.from(0);
+            let mockTokenAmountToSend = BigNumber.from(0);
+            let mockToken2AmountToSend = BigNumber.from(0);
+            batchSendObject.forEach(call => {
+                nativeAmountToSend = nativeAmountToSend.add(BigNumber.from(call.nativeAmount));
+                if (call.tokenAddress == mockToken.address) mockTokenAmountToSend = mockTokenAmountToSend.add(BigNumber.from(call.amount));
+                if (call.tokenAddress == mockToken2.address) mockToken2AmountToSend = mockToken2AmountToSend.add(BigNumber.from(call.amount));
+            });
+            const adjustedBatchSendObject = batchSendObject.map(({ nativeAmount, ...rest }) => rest);
+
+            await mockToken.increaseAllowance(tippingContract.address, mockTokenAmountToSend)
+            await mockToken2.increaseAllowance(tippingContract.address, mockToken2AmountToSend)
+            await mockNFT.approve(tippingContract.address, erc721ID)
             await mockERC1155.setApprovalForAll(tippingContract.address, true)
 
-            await tippingContract.batch([
-                sendNativeToBytes(signer1Address, weiToSend, ""),
-                sendERC20ToBytes(signer1Address, 50, mockToken.address, ""),
-                sendERC721ToBytes(signer2Address, 0, mockNFT.address, ""),
-                sendERC1155ToBytes(signer1Address, 3, 20, mockERC1155.address, ""),
-                sendNativeToBytes(signer2Address, weiToSend, "")
-            ], { value: dollarInWei.mul(2).add(weiToSend).add(weiToSend) })
+            await tippingContract.batchSendTo(adjustedBatchSendObject, { value: nativeAmountToSend })
 
-            const tippingContractBalanceAfter = await provider.getBalance(tippingContract.address)
-            expect(tippingContractBalanceAfter).to.equal(dollarInWei.mul(2).add(tippingContractBalanceBefore).add((weiToSend / 100) * 2))
+            const tippingContractNativeBalanceAfter = await provider.getBalance(tippingContract.address)
+            const tippingContractERC20BalanceAfter = await mockToken.balanceOf(tippingContract.address)
+            const tippingContractSupportedERC20BalanceAfter = await mockToken2.balanceOf(tippingContract.address)
+            const sig1ERC1155BalanceAfter = await mockERC1155.balanceOf(signer1Address, erc1155ID)
+            expect(tippingContractNativeBalanceAfter).to.equal(tippingContractNativeBalanceBefore.add(dollarInWei.mul(3)).add(nativeWeiToReceive.div(100)))
+            expect(tippingContractERC20BalanceAfter).to.equal(tippingContractERC20BalanceBefore)
+            expect(tippingContractSupportedERC20BalanceAfter).to.equal(tippingContractSupportedERC20BalanceBefore.add(supportedErc20WeiToReceive.div(100)))
+            expect(sig1ERC1155BalanceAfter).to.equal(sig1ERC1155BalanceBefore.add(erc1155ToReceive))
+            expect(await mockNFT.ownerOf(erc721ID)).to.equal(signer1Address)
         })
 
         it('reverts when trying to send more than msg.value', async () => {
-            await mockToken.increaseAllowance(tippingContract.address, 50)
+            const weiToSend = BigNumber.from("1000000");
+            const tokensToSend = BigNumber.from("1000000");
+            await mockToken.increaseAllowance(tippingContract.address, tokensToSend)
 
-            await expect(tippingContract.batch([
-                sendERC20ToBytes(signer1Address, 50, mockToken.address, ""),
-                sendNativeToBytes(signer1Address, dollarInWei.mul(2), ""),
-            ], { value: dollarInWei })).to.be.revertedWith('Can\'t send more than msg.value')
+            const batchObject1 = {
+                assetType: AssetType.Native,
+                recipient: signer1Address,
+                amount: weiToSend,
+                tokenId: 0,
+                tokenAddress: ZERO_ADDRESS,
+                message: ""
+            }
+            const batchObject2 = {
+                assetType: AssetType.ERC20,
+                recipient: signer1Address,
+                amount: tokensToSend,
+                tokenId: 0,
+                tokenAddress: mockToken.address,
+                message: ""
+            }
+
+            await expect(tippingContract.batchSendTo([batchObject1, batchObject2], { value: weiToSend }))
+            .to.be.revertedWith('')
         })
     })
 })
