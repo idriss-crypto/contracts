@@ -51,7 +51,6 @@ describe("Tipping contract", async () => {
     let ownerAddress: string;
     let signer1Address: string;
     let signer2Address: string;
-    let signer3Address: string;
     let mockToken: MockToken;
     let mockToken2: MockToken;
     let mockNFT: MockNFT;
@@ -59,7 +58,6 @@ describe("Tipping contract", async () => {
     let mockERC1155: MockERC1155;
     let mockERC1155_2: MockERC1155;
     let mockPriceOracle: MaticPriceAggregatorV3Mock;
-    let mockSequencer: MaticPriceAggregatorV3Mock;
     let mockEAS: MockEAS;
     let tippingContract: Tipping;
     let provider: MockProvider;
@@ -190,13 +188,7 @@ describe("Tipping contract", async () => {
         ownerAddress = await owner.getAddress();
         signer1Address = await signer1.getAddress();
         signer2Address = await signer2.getAddress();
-        signer3Address = await signer3.getAddress();
         mockPriceOracle = (await waffle.deployContract(
-            owner,
-            MaticPriceAggregatorV3MockArtifact,
-            []
-        )) as MaticPriceAggregatorV3Mock;
-        mockSequencer = (await waffle.deployContract(
             owner,
             MaticPriceAggregatorV3MockArtifact,
             []
