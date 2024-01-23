@@ -32,7 +32,7 @@ contract PublicGoodAttester {
      * @dev Attests to a schema that receives parameter
      * @param _publicGood: recipient address of public good
      */
-    function _attestDonor(address _publicGood) internal {
+    function _attestDonor(address _publicGood, address _assetAddress, uint256 _amount, uint256 _assetId) internal {
         EAS.attest(
             AttestationRequest({
                 schema: EAS_SCHEMA,
@@ -41,7 +41,7 @@ contract PublicGoodAttester {
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
                     revocable: false,
                     refUID: EMPTY_UID, // No references UI
-                    data: abi.encode(_publicGood), // Encode grantee address
+                    data: abi.encode(_publicGood, _assetAddress, _amount, _assetId), // Encode grantee address
                     value: 0 // No value/ETH
                 })
             })
