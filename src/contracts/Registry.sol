@@ -2,23 +2,24 @@
 pragma solidity ^0.8.7;
 
 interface ERC20 {
-    function balanceOf(address _tokenOwner)
-        external
-        view
-        returns (uint balance);
+    function balanceOf(
+        address _tokenOwner
+    ) external view returns (uint balance);
 
-    function transfer(address _to, uint _tokens)
-        external
-        returns (bool success);
+    function transfer(
+        address _to,
+        uint _tokens
+    ) external returns (bool success);
 
-    function approve(address _spender, uint256 _value)
-        external
-        returns (bool success);
+    function approve(
+        address _spender,
+        uint256 _value
+    ) external returns (bool success);
 
-    function allowance(address _contract, address _spender)
-        external
-        view
-        returns (uint256 remaining);
+    function allowance(
+        address _contract,
+        address _spender
+    ) external view returns (uint256 remaining);
 
     function transferFrom(
         address _from,
@@ -102,7 +103,9 @@ contract IDrissMappings {
             value: address(this).balance,
             gas: 40000
         }("");
-        if(!sent) {revert IDrissMappings__FailedToWithdraw();}
+        if (!sent) {
+            revert IDrissMappings__FailedToWithdraw();
+        }
         return data;
     }
 
@@ -133,10 +136,12 @@ contract IDrissMappings {
         if (admins[msg.sender] != true) {
             revert IDrissMappings__OnlyTrustedAdminCanAddIDriss();
         }
-        if(keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes(""))) {
+        if (keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes(""))) {
             revert IDrissMappings__CannotChangeExistingBinding();
         }
-        if(msg.value < price){ revert IDrissMappings__NotEnough_MATIC();}
+        if (msg.value < price) {
+            revert IDrissMappings__NotEnough_MATIC();
+        }
         IDriss[hashID] = address_;
         IDrissHash[hashPub] = hashID;
         IDrissOwners[hashPub] = ownerAddress;
@@ -156,7 +161,7 @@ contract IDrissMappings {
         if (admins[msg.sender] != true) {
             revert IDrissMappings__OnlyTrustedAdminCanAddIDriss();
         }
-        if(keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes(""))) {
+        if (keccak256(bytes(IDrissHash[hashPub])) != keccak256(bytes(""))) {
             revert IDrissMappings__BindingAlreadyCreated();
         }
         ERC20 paymentTc = ERC20(token);
@@ -180,7 +185,7 @@ contract IDrissMappings {
         if (IDrissOwners[hashPub] != msg.sender) {
             revert IDrissMappings__OnlyIDrissOwnerCanDeleteBinding();
         }
-        if(keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes(""))){
+        if (keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes(""))) {
             revert IDrissMappings__BindingDoesNotExist();
         }
         delete IDriss[IDrissHash[hashPub]];
@@ -191,21 +196,19 @@ contract IDrissMappings {
         emit IDrissDeleted(hashPub);
     }
 
-    function getIDriss(string memory hashPub)
-        public
-        view
-        returns (string memory)
-    {
-        if(keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes(""))){
+    function getIDriss(
+        string memory hashPub
+    ) public view returns (string memory) {
+        if (keccak256(bytes(IDrissHash[hashPub])) == keccak256(bytes(""))) {
             revert IDrissMappings__BindingDoesNotExist();
         }
         return IDriss[IDrissHash[hashPub]];
     }
 
-    function transferIDrissOwnership(string memory hashPub, address newOwner)
-        external
-        payable
-    {
+    function transferIDrissOwnership(
+        string memory hashPub,
+        address newOwner
+    ) external payable {
         if (IDrissOwners[hashPub] != msg.sender) {
             revert IDrissMappings__OnlyIDrissOwnerCanChangeOwnership();
         }

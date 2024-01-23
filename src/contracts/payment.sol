@@ -12,11 +12,10 @@ error Payments__OnlyContractOwnerCanChangeOwnershipOfContract();
 error Payments__Ownable_NewContractOwnerIsTheZeroAddress();
 
 contract payments {
-
     address public contractOwner = msg.sender;
     mapping(string => uint256) percent;
     mapping(address => bool) private admins;
-    mapping(address => uint256) public balanceOf; 
+    mapping(address => uint256) public balanceOf;
     mapping(bytes32 => address) public receipts;
     mapping(bytes32 => uint256) public amounts;
     mapping(string => address) public delegate;
@@ -26,38 +25,71 @@ contract payments {
         percent["IDriss"] = 100;
     }
 
-    event PaymentDone(address payer, uint256 amount, bytes32 paymentId_hash, string IDrissHash, uint256 date);
+    event PaymentDone(
+        address payer,
+        uint256 amount,
+        bytes32 paymentId_hash,
+        string IDrissHash,
+        uint256 date
+    );
     event AdminAdded(address indexed admin);
     event AdminDeleted(address indexed admin);
     event DelegateAdded(string delegateHandle, address indexed delegateAddress);
-    event DelegateDeleted(string delegateHandle, address indexed delegateAddress);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event DelegateDeleted(
+        string delegateHandle,
+        address indexed delegateAddress
+    );
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     function addAdmin(address adminAddress) external {
-        if(msg.sender != contractOwner) { revert Payments__OnlyContractOwnerCanAddAdmins(); }
+        if (msg.sender != contractOwner) {
+            revert Payments__OnlyContractOwnerCanAddAdmins();
+        }
         admins[adminAddress] = true;
         emit AdminAdded(adminAddress);
     }
 
     function deleteAdmin(address adminAddress) external {
-        if(msg.sender != contractOwner) { revert Payments__OnlyContractOwnerCanDeleteAdmins(); }
+        if (msg.sender != contractOwner) {
+            revert Payments__OnlyContractOwnerCanDeleteAdmins();
+        }
         admins[adminAddress] = false;
         emit AdminDeleted(adminAddress);
     }
 
-    function addDelegateException(address delegateAddress, string calldata delegateHandle, uint256 percentage) external {
-        if(msg.sender != contractOwner){revert Payments__OnlyContractOwnerCanAddSpecialDelegatePartner();}
-        if(delegate[delegateHandle] != address(0)){revert Payments__DelegateHandleExists();}
-        if(delegateAddress == address(0)){revert Payments__Ownable_DelegateAddressIsTheZeroAddress();}
+    function addDelegateException(
+        address delegateAddress,
+        string calldata delegateHandle,
+        uint256 percentage
+    ) external {
+        if (msg.sender != contractOwner) {
+            revert Payments__OnlyContractOwnerCanAddSpecialDelegatePartner();
+        }
+        if (delegate[delegateHandle] != address(0)) {
+            revert Payments__DelegateHandleExists();
+        }
+        if (delegateAddress == address(0)) {
+            revert Payments__Ownable_DelegateAddressIsTheZeroAddress();
+        }
         delegate[delegateHandle] = delegateAddress;
         percent[delegateHandle] = percentage;
         emit DelegateAdded(delegateHandle, delegateAddress);
     }
 
     // Anyone can create a delegate link for anyone
-    function addDelegate(address delegateAddress, string calldata delegateHandle) external {
-        if(delegate[delegateHandle] != address(0)){revert Payments__DelegateHandleExists();}
-        if(delegateAddress == address(0)){revert Payments__Ownable_DelegateAddressIsTheZeroAddress();}
+    function addDelegate(
+        address delegateAddress,
+        string calldata delegateHandle
+    ) external {
+        if (delegate[delegateHandle] != address(0)) {
+            revert Payments__DelegateHandleExists();
+        }
+        if (delegateAddress == address(0)) {
+            revert Payments__Ownable_DelegateAddressIsTheZeroAddress();
+        }
         delegate[delegateHandle] = delegateAddress;
         percent[delegateHandle] = 20;
         emit DelegateAdded(delegateHandle, delegateAddress);
@@ -65,7 +97,9 @@ contract payments {
 
     // Delete the delegation link if needed.
     function deleteDelegate(string calldata delegateHandle) external {
-        if(msg.sender != delegate[delegateHandle]){revert Payments__OnlyDelegateCanDeleteDelegationLink();}
+        if (msg.sender != delegate[delegateHandle]) {
+            revert Payments__OnlyDelegateCanDeleteDelegationLink();
+        }
         address deletedDelegate = delegate[delegateHandle];
         delete delegate[delegateHandle];
         delete percent[delegateHandle];
@@ -73,44 +107,73 @@ contract payments {
     }
 
     // Payment function distributing the payment into two balances.
-    function payNative(bytes32 paymentId_hash, string calldata IDrissHash, string calldata delegateHandle) external payable {
-        if(receipts[paymentId_hash] != address(0)){revert Payments__AlreadyPaidThisReceipt();}
+    function payNative(
+        bytes32 paymentId_hash,
+        string calldata IDrissHash,
+        string calldata delegateHandle
+    ) external payable {
+        if (receipts[paymentId_hash] != address(0)) {
+            revert Payments__AlreadyPaidThisReceipt();
+        }
         receipts[paymentId_hash] = msg.sender;
         amounts[paymentId_hash] = msg.value;
         if (delegate[delegateHandle] != address(0)) {
-            uint256 delegateAmount = (msg.value * percent[delegateHandle]) / 100;
+            uint256 delegateAmount = (msg.value * percent[delegateHandle]) /
+                100;
             balanceOf[contractOwner] += msg.value - delegateAmount;
             balanceOf[delegate[delegateHandle]] += delegateAmount;
         } else {
             balanceOf[contractOwner] += msg.value;
         }
-        emit PaymentDone(receipts[paymentId_hash], amounts[paymentId_hash], paymentId_hash, IDrissHash, block.timestamp);
+        emit PaymentDone(
+            receipts[paymentId_hash],
+            amounts[paymentId_hash],
+            paymentId_hash,
+            IDrissHash,
+            block.timestamp
+        );
     }
 
     // Anyone can withraw funds to any participating delegate
-    function withdraw(uint256 amount, string calldata delegateHandle) external returns (bytes memory) {
+    function withdraw(
+        uint256 amount,
+        string calldata delegateHandle
+    ) external returns (bytes memory) {
         require(amount <= balanceOf[delegate[delegateHandle]]);
         balanceOf[delegate[delegateHandle]] -= amount;
-        (bool sent, bytes memory data) = delegate[delegateHandle].call{value: amount, gas: 40000}("");
+        (bool sent, bytes memory data) = delegate[delegateHandle].call{
+            value: amount,
+            gas: 40000
+        }("");
         require(sent, "Failed to  withdraw");
         return data;
     }
 
     // commit payment hash creation
-    function hashReceipt(string memory receiptId, address paymAddr) public pure returns (bytes32) {
+    function hashReceipt(
+        string memory receiptId,
+        address paymAddr
+    ) public pure returns (bytes32) {
         return keccak256(abi.encode(receiptId, paymAddr));
     }
 
     // reveal payment hash
-    function verifyReceipt(string memory receiptId, address paymAddr) public view returns (bool) {
+    function verifyReceipt(
+        string memory receiptId,
+        address paymAddr
+    ) public view returns (bool) {
         require(receipts[hashReceipt(receiptId, paymAddr)] == paymAddr);
         return true;
     }
 
     // Transfer contract ownership
     function transferContractOwnership(address newOwner) public payable {
-        if(msg.sender != contractOwner){revert Payments__OnlyContractOwnerCanChangeOwnershipOfContract();}
-        if(newOwner == address(0)){revert Payments__Ownable_NewContractOwnerIsTheZeroAddress();}
+        if (msg.sender != contractOwner) {
+            revert Payments__OnlyContractOwnerCanChangeOwnershipOfContract();
+        }
+        if (newOwner == address(0)) {
+            revert Payments__Ownable_NewContractOwnerIsTheZeroAddress();
+        }
         _transferOwnership(newOwner);
     }
 

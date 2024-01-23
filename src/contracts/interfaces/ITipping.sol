@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { AssetType } from "../enums/IDrissEnums.sol";
-import { BatchCall } from "../structs/IDrissStructs.sol";
+import {AssetType} from "../enums/IDrissEnums.sol";
+import {BatchCall} from "../structs/IDrissStructs.sol";
 
 interface ITipping {
-
     function sendNativeTo(
         address _recipient,
         string memory _message
@@ -33,7 +32,7 @@ interface ITipping {
         string memory _message
     ) external payable;
 
-    function batchSendTo (BatchCall [] calldata calls) external payable;
+    function batchSendTo(BatchCall[] calldata calls) external payable;
 
     function withdraw() external;
 
@@ -50,5 +49,4 @@ interface ITipping {
     function addSupportedERC20(address erc20Address) external;
 
     function deleteSupportedERC20(address erc20Address) external;
-
 }

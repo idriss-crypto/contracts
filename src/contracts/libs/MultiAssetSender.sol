@@ -16,17 +16,16 @@ error NothingToSend();
  * @dev Please note that you should make reentrancy check yourself
  */
 contract MultiAssetSender {
-
-    constructor() { }
+    constructor() {}
 
     using SafeERC20 for IERC20;
 
     /**
-    * @notice Wrapper for sending native Coin via call function
-    * @dev When using this function please make sure to not send it to anyone, verify the
-    *      address in IDriss registry
-    */
-    function _sendCoin (address _to, uint256 _amount) internal {
+     * @notice Wrapper for sending native Coin via call function
+     * @dev When using this function please make sure to not send it to anyone, verify the
+     *      address in IDriss registry
+     */
+    function _sendCoin(address _to, uint256 _amount) internal {
         (bool sent, ) = payable(_to).call{value: _amount}("");
         if (!sent) {
             revert CoinSendFailed();
@@ -34,12 +33,12 @@ contract MultiAssetSender {
     }
 
     /**
-     * @notice Wrapper for sending single ERC1155 asset 
+     * @notice Wrapper for sending single ERC1155 asset
      * @dev due to how approval in ERC1155 standard is handled, the smart contract has to ask for permissions to manage
      *      ALL tokens "for simplicity"... Hence, it has to be done before calling function that transfers the token
      *      to smart contract, and revoked afterwards
      */
-    function _sendERC1155AssetBatch (
+    function _sendERC1155AssetBatch(
         uint256[] memory _assetIds,
         uint256[] memory _amounts,
         address _from,
@@ -56,7 +55,7 @@ contract MultiAssetSender {
      *      ALL tokens "for simplicity"... Hence, it has to be done before calling function that transfers the token
      *      to smart contract, and revoked afterwards
      */
-    function _sendERC1155 (
+    function _sendERC1155(
         uint256 _assetId,
         uint256 _amount,
         address _from,
@@ -70,7 +69,7 @@ contract MultiAssetSender {
     /**
      * @notice Wrapper for sending NFT asset
      */
-    function _sendERC721 (
+    function _sendERC721(
         uint256 _assetId,
         address _from,
         address _to,
@@ -83,7 +82,7 @@ contract MultiAssetSender {
     /**
      * @notice Wrapper for sending NFT asset with additional checks and iteraton over an array
      */
-    function _sendNFTAssetBatch (
+    function _sendNFTAssetBatch(
         uint256[] memory _assetIds,
         address _from,
         address _to,
@@ -102,7 +101,7 @@ contract MultiAssetSender {
     /**
      * @notice Wrapper for sending ERC20 Token asset with additional checks
      */
-    function _sendERC20 (
+    function _sendERC20(
         uint256 _amount,
         address _to,
         address _contractAddress
@@ -115,7 +114,7 @@ contract MultiAssetSender {
     /**
      * @notice Wrapper for sending ERC20 token from specific account with additional checks and iteraton over an array
      */
-    function _sendERC20From (
+    function _sendERC20From(
         uint256 _amount,
         address _from,
         address _to,
