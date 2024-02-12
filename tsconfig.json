@@ -1,33 +1,19 @@
 {
   "compilerOptions": {
-    "target": "es2018",
+    "target": "es2020",
     "module": "commonjs",
-    "strict": true,
     "esModuleInterop": true,
-    "outDir": "dist",
-    "declaration": true,
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx"
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
   "include": [
     "./scripts",
     "./test",
     "./src",
     "./src/types",
-    "./typechain"
+    "./typechain-types"
   ],
   "files": [
     "./hardhat.config.ts"

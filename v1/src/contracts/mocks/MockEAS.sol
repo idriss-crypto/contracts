@@ -19,18 +19,17 @@ contract MockEAS {
         bytes32 schema; // The unique identifier of the schema.
         AttestationRequestData data; // The arguments of the attestation request.
     }
+    mapping(address => bool) public mockAttestations;
 
-    // Mock Attested event
-    event Attested(address indexed recipient, address indexed attester, bytes32 indexed schema);
+    constructor() {
 
-    constructor() {}
+    }
 
-    // Attests to a schema that receives parameter
-    function attest(
-        AttestationRequest calldata request
-    ) external payable returns (bytes32) {
-        emit Attested(request.data.recipient, msg.sender, request.schema);
+  // Attests to a schema that receives parameter
+  function attest(AttestationRequest calldata request) external payable returns (bytes32) {
+        mockAttestations[msg.sender] = true;
         bytes32 nothing;
         return nothing;
     }
+
 }

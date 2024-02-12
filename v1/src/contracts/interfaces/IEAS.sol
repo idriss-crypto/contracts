@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.0;
 
-import {ISchemaRegistry} from "./ISchemaRegistry.sol";
-import {Attestation, EIP712Signature} from "../libs/Common.sol";
+import { ISchemaRegistry } from "./ISchemaRegistry.sol";
+import { Attestation, EIP712Signature } from "../libs/Common.sol";
 
 /// @notice A struct representing the arguments of the attestation request.
 struct AttestationRequestData {
@@ -80,41 +80,24 @@ struct MultiDelegatedRevocationRequest {
 /// @title IEAS
 /// @notice EAS - Ethereum Attestation Service interface.
 interface IEAS {
-    event Attested(
-        address indexed recipient,
-        address indexed attester,
-        bytes32 uid,
-        bytes32 indexed schema
-    );
 
-    event Revoked(
-        address indexed recipient,
-        address indexed attester,
-        bytes32 uid,
-        bytes32 indexed schema
-    );
+    event Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schema);
+
+    event Revoked(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schema);
 
     event Timestamped(bytes32 indexed data, uint64 indexed timestamp);
 
-    event RevokedOffchain(
-        address indexed revoker,
-        bytes32 indexed data,
-        uint64 indexed timestamp
-    );
+    event RevokedOffchain(address indexed revoker, bytes32 indexed data, uint64 indexed timestamp);
 
     function getSchemaRegistry() external view returns (ISchemaRegistry);
 
-    function attest(
-        AttestationRequest calldata request
-    ) external payable returns (bytes32);
+    function attest(AttestationRequest calldata request) external payable returns (bytes32);
 
     function attestByDelegation(
         DelegatedAttestationRequest calldata delegatedRequest
     ) external payable returns (bytes32);
 
-    function multiAttest(
-        MultiAttestationRequest[] calldata multiRequests
-    ) external payable returns (bytes32[] memory);
+    function multiAttest(MultiAttestationRequest[] calldata multiRequests) external payable returns (bytes32[] memory);
 
     function multiAttestByDelegation(
         MultiDelegatedAttestationRequest[] calldata multiDelegatedRequests
@@ -122,13 +105,9 @@ interface IEAS {
 
     function revoke(RevocationRequest calldata request) external payable;
 
-    function revokeByDelegation(
-        DelegatedRevocationRequest calldata delegatedRequest
-    ) external payable;
+    function revokeByDelegation(DelegatedRevocationRequest calldata delegatedRequest) external payable;
 
-    function multiRevoke(
-        MultiRevocationRequest[] calldata multiRequests
-    ) external payable;
+    function multiRevoke(MultiRevocationRequest[] calldata multiRequests) external payable;
 
     function multiRevokeByDelegation(
         MultiDelegatedRevocationRequest[] calldata multiDelegatedRequests
@@ -140,20 +119,13 @@ interface IEAS {
 
     function revokeOffchain(bytes32 data) external returns (uint64);
 
-    function multiRevokeOffchain(
-        bytes32[] calldata data
-    ) external returns (uint64);
+    function multiRevokeOffchain(bytes32[] calldata data) external returns (uint64);
 
-    function getAttestation(
-        bytes32 uid
-    ) external view returns (Attestation memory);
+    function getAttestation(bytes32 uid) external view returns (Attestation memory);
 
     function isAttestationValid(bytes32 uid) external view returns (bool);
 
     function getTimestamp(bytes32 data) external view returns (uint64);
 
-    function getRevokeOffchain(
-        address revoker,
-        bytes32 data
-    ) external view returns (uint64);
+    function getRevokeOffchain(address revoker, bytes32 data) external view returns (uint64);
 }
