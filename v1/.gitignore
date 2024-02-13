@@ -1,4 +1,4 @@
-.idea/
+../.idea/
 cache
 node_modules
 **/.deps
@@ -7,5 +7,5 @@ coverage
 coverage.json
 
 # .env files, only dev is allowed
-.env.*
+.env.dev
 !.env.dev
