@@ -3,9 +3,9 @@ A set of Solidity smart contracts used by IDriss.
 
 ## Version info
 IDriss currently uses v1 Contracts for everything except the tipping contracts. 
-Refer to v2 for updated functionality and support.
+Refer to v2 for updated tipping contract functionality and support.
 
-- [Version 2 Documentation](v2/README.md)
+- [Version 2](https://github.com/idriss-crypto/tippingContract)
 
 ## Setting Up and Updating Submodules
 

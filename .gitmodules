@@ -1,0 +1,3 @@
+[submodule "tippingContract"]
+	path = tippingContract
+	url = https://github.com/idriss-crypto/tippingContract
