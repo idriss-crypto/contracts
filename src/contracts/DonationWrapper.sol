@@ -98,7 +98,7 @@ contract DonationWrapper is
 
         (, address donor, ) = abi.decode(
             donationData,
-            (uint256, address, bytes) // roundId, grantee, donor, voteParams(encoded)
+            (uint256, address, bytes) // roundId, donor, voteParams(encoded)
         );
 
         if (!verifyDonation(donationData, signature) || msg.sender != donor)
@@ -240,7 +240,7 @@ contract DonationWrapper is
     ) public pure returns (bool) {
         (, address donor, ) = abi.decode(
             donationData,
-            (uint256, address, bytes) // roundId, grantee, donor, voteParams(encoded)
+            (uint256, address, bytes) // roundId, donor, voteParams(encoded)
         );
 
         return verify(donor, donationData, signature);
