@@ -8,12 +8,6 @@ bytes32 constant EMPTY_UID = 0;
 // A zero expiration represents an non-expiring attestation.
 uint64 constant NO_EXPIRATION_TIME = 0;
 
-error AccessDenied();
-error InvalidEAS();
-error InvalidLength();
-error InvalidSignature();
-error NotFound();
-
 /// @notice A struct representing EIP712 signature data.
 struct EIP712Signature {
     uint8 v; // The recovery ID.
@@ -34,11 +28,3 @@ struct Attestation {
     bool revocable; // Whether the attestation is revocable.
     bytes data; // Custom attestation data.
 }
-
-/// @notice A helper function to work with unchecked iterators in loops.
-function uncheckedInc(uint256 i) pure returns (uint256 j) {
-    unchecked {
-        j = i + 1;
-    }
-}
-

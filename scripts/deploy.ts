@@ -1,59 +1,39 @@
-import { SendToHash } from '../src/types/SendToHash'
-import { Tipping } from '../src/types/Tipping'
-import { ethers } from 'hardhat'
+import {ethers, hardhatArguments} from "hardhat";
+
+function getArgFileName(networkName: string): string {
+    return `../args-${networkName.toLowerCase()}.js`;
+  }
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
 
-  console.log("Deploying contracts with the account:", deployer.address);
+    const argFileName = getArgFileName(hardhatArguments.network!);
 
-  console.log("Account balance: ", (await deployer.getBalance()).toString());
+    let constructorArguments;
+    try {
+        constructorArguments = require(argFileName);
+        console.log(hardhatArguments.network, constructorArguments)
+    } catch (e) {
+        console.error(`Failed to load constructor arguments from ${argFileName}:`, e);
+        return;
+    }
 
-  if (process.env.DEPLOY_SEND_TO_ANYONE == 'true') {
-    console.log("Deploying SendToAnyone")
-    const SendToHash = await ethers.getContractFactory("SendToHash");
-    const sendToHash = await SendToHash.deploy(
-        process.env.IRDISS_REGISTRY_CONTRACT_ADDRESS!,
-        process.env.MATIC_USD_PRICE_FEED_AGGREGATOR_CONTRACT_ADDRESS!
+    const wrapper = await ethers.deployContract(
+        "DonationWrapper",
+        constructorArguments,
+        {}
     );
+    const DonationWrapperFactory = await ethers.getContractFactory("DonationWrapper");
 
-    await sendToHash.deployed()
+     // Estimate the gas required for deployment
+    const estimatedGas = await DonationWrapperFactory.getDeployTransaction(...constructorArguments).estimateGas();
+    console.log(`Estimated gas for deployment: ${estimatedGas}`);
 
-    console.log("deployed SendToHash address:", sendToHash.address);
-  }
+    await wrapper.waitForDeployment();
 
-  if (process.env.DEPLOY_TIPPING == 'true') {
-    console.log("Deploying Tipping")
-    const Tipping = await ethers.getContractFactory("Tipping");
-    const tipping = await Tipping.deploy(
-        process.env.MATIC_USD_PRICE_FEED_AGGREGATOR_CONTRACT_ADDRESS!
-    );
-
-    await tipping.deployed()
-
-    console.log("deployed Tipping address:", tipping.address);
-  }
-
-  //if you need to perform some action after deployment
-  // const deployedSendToHash = (await ethers.getContractAt("SendToHash", sendToHash.address, deployer)) as SendToHash;
-  // await deployedSendToHash.transferOwnership(deployer.address)
-  //   .then(transaction => {
-  //     return transaction.wait(1)
-  //   }
-  //   )
-  //   .then(receipt => {
-  //     if (receipt.status !== 1) {
-  //       console.error("Transfering ownership failed")
-  //       console.error(JSON.stringify(receipt))
-  //     }
-  //   })
-
-  console.log("DONE")
+    console.log(`Deployed at ${await wrapper.getAddress()}`);
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
+main().catch((error) => {
     console.error(error);
-    process.exit(1);
-  });
+    process.exitCode = 1;
+});
