@@ -171,15 +171,17 @@ contract DonationWrapper is
 
         if (!verifyDonation(message)) revert Unauthorized();
 
-        (, uint256 roundId, address donor, bytes memory voteParams, , , ) = abi
+        (, uint256 roundId, address donor, bytes memory voteParams, uint256 nonce, , ) = abi
             .decode(
                 message,
                 (uint256, uint256, address, bytes, uint256, uint256, bytes)
             );
 
+        require(nonce == nonces[donor], "Invalid nonce");
+        nonces[donor]++;
+
         handleDonation(roundId, donor, voteParams, amount, tokenSent, relayer);
 
-        nonces[donor]++;
     }
 
     /**
@@ -284,7 +286,6 @@ contract DonationWrapper is
         );
 
         address signer = ECDSA.recover(digest, signature);
-        require(nonce == nonces[signer], "Invalid nonce");
         require(block.chainid == chainId, "Invalid chain");
         require(block.timestamp <= validUntil, "Signature has expired");
         return signer == donor;
