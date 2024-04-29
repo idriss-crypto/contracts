@@ -91,15 +91,14 @@ contract DonationWrapper is
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256(
-                    "EIP712Domain(string name,string version,address verifyingContract)"
+                    "EIP712Domain(string name,string version)"
                 ),
                 keccak256(bytes("IDrissCrossChainDonations")),
-                keccak256(bytes("1")),
-                address(this)
+                keccak256(bytes("1"))
             )
         );
         VOTING_DATA_TYPEHASH = keccak256(
-            "Donation(uint256 chainId,uint256 roundId,address donor,bytes voteParams,uint256 nonce,uint256 validUntil)"
+            "Donation(uint256 chainId,uint256 roundId,address donor,bytes voteParams,uint256 nonce,uint256 validUntil,address verifyingContract)"
         );
     }
 
@@ -113,9 +112,9 @@ contract DonationWrapper is
         DepositParams memory params,
         bytes memory message
     ) external payable nonReentrant {
-        (, , address donor, , , , ) = abi.decode(
+        (, , address donor, , , , , ) = abi.decode(
             message,
-            (uint256, uint256, address, bytes, uint256, uint256, bytes)
+            (uint256, uint256, address, bytes, uint256, uint256, address, bytes)
         );
 
         if (!verifyDonation(message) || msg.sender != donor)
@@ -171,14 +170,15 @@ contract DonationWrapper is
 
         if (!verifyDonation(message)) revert Unauthorized();
 
-        (uint256 chainId, uint256 roundId, address donor, bytes memory voteParams, uint256 nonce, , ) = abi
+        (uint256 chainId, uint256 roundId, address donor, bytes memory voteParams, uint256 nonce, , address verifyingContract, ) = abi
             .decode(
                 message,
-                (uint256, uint256, address, bytes, uint256, uint256, bytes)
+                (uint256, uint256, address, bytes, uint256, uint256, address, bytes)
             );
 
         require(nonce == nonces[donor], "Invalid nonce");
         require(block.chainid == chainId, "Invalid chain");
+        require(address(this) == verifyingContract, "Invalid verifyingContract");
         nonces[donor]++;
 
         handleDonation(roundId, donor, voteParams, amount, tokenSent, relayer);
@@ -264,10 +264,11 @@ contract DonationWrapper is
             bytes memory voteParams,
             uint256 nonce,
             uint256 validUntil,
+            address verifyingContract,
             bytes memory signature
         ) = abi.decode(
                 encoded,
-                (uint256, uint256, address, bytes, uint256, uint256, bytes)
+                (uint256, uint256, address, bytes, uint256, uint256, address, bytes)
             );
 
         bytes32 structHash = keccak256(
@@ -278,7 +279,8 @@ contract DonationWrapper is
                 donor,
                 keccak256(voteParams),
                 nonce,
-                validUntil
+                validUntil,
+                verifyingContract
             )
         );
 
