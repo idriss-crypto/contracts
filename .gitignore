@@ -7,5 +7,6 @@ coverage
 coverage.json
 
 # .env files, only dev is allowed
+.env
 .env.*
 !.env.dev

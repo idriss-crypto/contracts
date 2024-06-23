@@ -28,7 +28,7 @@
     "./src",
     "./src/types",
     "./typechain"
-  ],
+, "args.js"  ],
   "files": [
     "./hardhat.config.ts"
   ]

@@ -9,6 +9,17 @@ async function main() {
 
   console.log("Account balance: ", (await deployer.getBalance()).toString());
 
+  console.log("Deploying MultiResolve")
+  const IDrissWrapperContract = await ethers.getContractFactory("src/contracts/IDrissWrapperContract.sol:IDrissWrapperContract");
+  const idrissWrapperContract = await IDrissWrapperContract.deploy(
+      process.env.IRDISS_REGISTRY_CONTRACT_ADDRESS!,
+      process.env.IRDISS_REVERSE_REGISTRY_CONTRACT_ADDRESS!
+  );
+
+  await idrissWrapperContract.deployed()
+
+  console.log("deployed IDrissWrapperContract address:", idrissWrapperContract.address);
+
   if (process.env.DEPLOY_SEND_TO_ANYONE == 'true') {
     console.log("Deploying SendToAnyone")
     const SendToHash = await ethers.getContractFactory("SendToHash");

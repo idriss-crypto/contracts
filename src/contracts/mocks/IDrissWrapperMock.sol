@@ -3,7 +3,7 @@ pragma solidity 0.8.17;
 
 import { IIDrissRegistry } from "../interfaces/IIDrissRegistry.sol";
 
-contract IDrissWrapperContract {
+contract IDrissWrapperContractMock {
     IIDrissRegistry public registry;
 
     struct IDrissResult {

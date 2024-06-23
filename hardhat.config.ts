@@ -12,7 +12,6 @@ import { HardhatUserConfig, task } from 'hardhat/config'
 import {Contract} from "ethers";
 
 const IDrissArtifact = require('./src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/IDriss.json')
-const IDrissWrapperArtifact = require('./src/artifacts/src/contracts/mocks/IDrissWrapperMock.sol/IDrissWrapperContract.json')
 const MaticPriceAggregatorV3MockArtifact = require('./src/artifacts/src/contracts/mocks/MaticPriceAggregatorV3Mock.sol/MaticPriceAggregatorV3Mock.json')
 const MockERC1155Artifact = require('./src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockERC1155.json')
 const MockNFTArtifact = require('./src/artifacts/src/contracts/mocks/IDrissRegistryMock.sol/MockNFT.json')

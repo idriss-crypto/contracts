@@ -5,11 +5,11 @@
     "slither": "slither src/contracts/SendToHash.sol --solc-remaps @=node_modules/@ --hardhat-artifacts-directory src/artifacts",
     "mythril": "myth a src/contracts/SendToHash.sol --solc-json ./mythril.config.json",
     "test": "npx hardhat test",
-    "deploy-dev":  "NODE_ENV=development env-cmd -f .env.dev  npx hardhat run scripts/deploy.ts --network ganache",
+    "deploy-dev": "NODE_ENV=development env-cmd -f .env.dev  npx hardhat run scripts/deploy.ts --network ganache",
     "deploy-test": "NODE_ENV=development env-cmd -f .env.test npx hardhat run scripts/deploy.ts --network mumbai",
-    "deploy-prod": "NODE_ENV=production  env-cmd -f .env.prod npx hardhat run scripts/deploy.ts --network polygon_mainnet",
+    "deploy-prod": "SET NODE_ENV=production & env-cmd -f .env.prod & npx hardhat run scripts/deploy.ts --network polygon_mainnet",
     "verify-dev": "NODE_ENV=production  env-cmd -f .env.prod npx hardhat verify --network polygon_mainnet CHANGEMYADDRESS CONST_PARAMS",
-    "verify-prod": "NODE_ENV=production  env-cmd -f .env.prod npx hardhat verify --network polygon_mainnet "
+    "verify-prod": "SET NODE_ENV=production & env-cmd -f .env.prod & npx hardhat verify --network polygon_mainnet 0x8C888B52E82f06eB9b6DedFFC7F5AA4Da4fDE562"
   },
   "author": "Rafal Kalinowski",
   "license": "MIT",
@@ -24,6 +24,7 @@
     "@types/mocha": "^9.0.0",
     "chai": "^4.3.6",
     "chai-as-promised": "^7.1.1",
+    "cross-env": "^7.0.3",
     "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.5.2",
