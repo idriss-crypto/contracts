@@ -22,7 +22,7 @@ contract DonationWrapper is
 {
     event InitializeEAS(address indexed eas);
     event Withdraw();
-    event Donate(uint256 roundId, bytes voteData, uint256 amount);
+    event Donate(uint256 indexed roundId, address indexed donor, bytes voteData, uint256 amount);
     event Deposit(address indexed donor, bytes message);
 
     error Unauthorized();
@@ -226,7 +226,7 @@ contract DonationWrapper is
 
         _vote(roundId, voteData, permit2Data.permit.permitted.amount);
 
-        emit Donate(roundId, voteData, permit2Data.permit.permitted.amount);
+        emit Donate(roundId, donor, voteData, permit2Data.permit.permitted.amount);
     }
 
     /**

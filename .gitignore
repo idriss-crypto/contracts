@@ -5,7 +5,10 @@ node_modules
 **/artifacts
 coverage
 coverage.json
+src/types
+typechain-types
 
 # .env files, only dev is allowed
 .env.*
 !.env.dev
+.env
