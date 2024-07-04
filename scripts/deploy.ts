@@ -1,11 +1,10 @@
-import {Tipping} from "../src/types/src/contracts/Tipping";
+// import {Tipping} from "../src/types/src/contracts/Tipping";
 import {ethers} from "hardhat";
 
 // npx hardhat run --network <network> scripts/deploy.ts
 // npx hardhat verify --network <network> <address> --constructor-args args.js
 
 const provider = ethers.provider;
-let tipping: Tipping;
 
 async function main() {
     const [deployer] = await ethers.getSigners();
@@ -18,7 +17,7 @@ async function main() {
     if (process.env.DEPLOY_TIPPING == "true") {
         console.log("Deploying Tipping");
         const Tipping = await ethers.getContractFactory("Tipping");
-        tipping = await Tipping.deploy(
+        const tipping = await Tipping.deploy(
             process.env.NATIVE_CURRENCY_ORACLE_ADDRESS!,
             process.env.NATIVE_CURRENCY_SEQUENCER_ADDRESS!,
             process.env.STALENESS_THRESHOLD!,
@@ -33,13 +32,23 @@ async function main() {
         console.log("deployed Tipping address:", await tipping.getAddress());
     }
 
+    if (process.env.DEPLOY_PAYMENT == "true") {
+        console.log("Deploying Payment");
+        const Payment = await ethers.getContractFactory("Payment");
+        const payment = await Payment.deploy();
+
+        await payment.waitForDeployment();
+
+        console.log("deployed Payment address:", await payment.getAddress());
+    }
+
     if (process.env.TRANFER_OWNERSHIP == "true") {
         console.log("Transferring ownership");
         const deployedTipping = (await ethers.getContractAt(
             "Tipping",
             process.env.TIPPING_ADDRESS!,
             deployer
-        )) as Tipping;
+        ));
         await deployedTipping
             .transferOwnership(process.env.NEW_OWNER!)
             .then((transaction) => {
@@ -64,7 +73,7 @@ async function main() {
             "Tipping",
             process.env.TIPPING_ADDRESS!,
             deployer
-        )) as Tipping;
+        ));
         await deployedTipping
             .addAdmin(process.env.ADMIN_ADDRESS!)
             .then((transaction) => {
@@ -86,7 +95,7 @@ async function main() {
             "Tipping",
             process.env.TIPPING_ADDRESS!,
             deployer
-        )) as Tipping;
+        ));
         await deployedTipping
             .addSupportedERC20(process.env.SUPPORTED_ERC20!)
             .then((transaction) => {

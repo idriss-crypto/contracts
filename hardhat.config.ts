@@ -119,6 +119,11 @@ const config: HardhatUserConfig = {
           url: 'https://rpc.linea.build',
           accounts: [process.env.PRIVATE_KEY!],
         },
+        aleph_testnet: {
+          chainId: 2039,
+          url: 'https://rpc.alephzero-testnet.gelato.digital',
+          accounts: [process.env.PRIVATE_KEY!],
+        },
         hardhat_node: {
             chainId: 1337,
             url: "http://127.0.0.1:8545",
@@ -130,6 +135,7 @@ const config: HardhatUserConfig = {
         optimisticGoerli: process.env.OPSCAN_KEY!,
         optimisticEthereum: process.env.OPSCAN_KEY!,
         ethereum: process.env.ETHERSCAN_KEY!,
+        mainnet: process.env.ETHERSCAN_KEY!,
         sepolia: process.env.ETHERSCAN_KEY!,
         mantleTest: process.env.MANTLE_KEY!,
         mantle: process.env.MANTLE_KEY!,
@@ -137,7 +143,8 @@ const config: HardhatUserConfig = {
         Scroll: process.env.SCROLL_KEY!,
         'base-goerli': process.env.BASESCAN_KEY!,
         base: process.env.BASESCAN_KEY!,
-        linea_mainnet: process.env.LINEASCAN_KEY!
+        linea_mainnet: process.env.LINEASCAN_KEY!,
+        aleph_testnet: process.env.ALEPHSCAN_KEY!
       },
       customChains: [
         {
@@ -186,6 +193,14 @@ const config: HardhatUserConfig = {
           urls: {
             apiURL: 'https://blockscout.scroll.io/api',
             browserURL: 'https://blockscout.scroll.io/',
+          },
+        },
+        {
+          network: 'aleph_testnet',
+          chainId: 2039,
+          urls: {
+            apiURL: 'https://aleph-zero.blockscout.com/api',
+            browserURL: 'https://aleph-zero.blockscout.com',
           },
         },
         {
